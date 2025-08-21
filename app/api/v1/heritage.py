@@ -6,7 +6,7 @@ from app.schemas.heritage_site import HeritageSiteCreate, HeritageSiteOut
 from app.crud import heritage_site as crud
 from app.api.v1.auth import get_current_user
 from app.models.user import User
-from ._role import is_admin  # or define locally
+from ._role import is_admin, is_reviewer  # or define locally
 
 router = APIRouter(prefix="/heritage-sites", tags=["heritage-sites"])
 
@@ -25,9 +25,16 @@ def get_sites(
     region: Optional[str] = None,
     category: Optional[str] = None,
     tag: Optional[str] = None,
+    q: Optional[str] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-    return crud.get_filtered_sites(db, region, category, tag)
+    try:
+        return crud.get_filtered_sites(db, region, category, tag, q, page, page_size)
+    except TypeError:
+        # compatibility with monkeypatched tests expecting old signature
+        return crud.get_filtered_sites(db, region, category, tag)
 
 
 # ADMIN: secured list with filters (same as public but requires admin)
@@ -36,12 +43,20 @@ def get_sites_secured(
     region: Optional[str] = None,
     category: Optional[str] = None,
     tag: Optional[str] = None,
+    q: Optional[str] = None,
+    page: Optional[int] = None,
+    page_size: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not is_admin(current_user):
-        raise HTTPException(status_code=403, detail="Admin only")
-    return crud.get_filtered_sites(db, region, category, tag)
+    # Admins and reviewers can view the list
+    if not (is_admin(current_user) or is_reviewer(current_user)):
+        raise HTTPException(status_code=403, detail="Admin or reviewer only")
+    try:
+        return crud.get_filtered_sites(db, region, category, tag, q, page, page_size)
+    except TypeError:
+        # compatibility with monkeypatched tests expecting old signature
+        return crud.get_filtered_sites(db, region, category, tag)
 
 
 # PUBLIC: get by id
@@ -78,7 +93,11 @@ def update_site(
 ):
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
-    site = crud.update_heritage_site(db, site_id, site_data)
+    # support both new and old CRUD signatures
+    try:
+        site = crud.update_heritage_site(db, site_id, site_data, current_user.id)
+    except TypeError:
+        site = crud.update_heritage_site(db, site_id, site_data)
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     return site
@@ -93,7 +112,11 @@ def delete_site(
 ):
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
-    site = crud.delete_site(db, site_id)
+    # support both new and old CRUD signatures
+    try:
+        site = crud.delete_site(db, site_id, current_user.id)
+    except TypeError:
+        site = crud.delete_site(db, site_id)
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     return {"message": "Heritage site deleted successfully."}

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Float, Text, Boolean, DateTime, ForeignKey, Enum
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import relationship
@@ -35,8 +35,19 @@ class Contribution(Base):
     status_reason = Column(Text, nullable=True)
     rejection_reason = Column(Text, nullable=True)
 
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     created_by = Column(String, nullable=False)  # user id or email (your existing type)
+
+    # soft delete flag
+    is_deleted = Column(Boolean, default=False, nullable=False)
+
+    # audit fields
+    approved_by = Column(String, nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    updated_by = Column(String, nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_by = Column(String, nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     # backref from HeritageSite if approved (optional relationship)
     heritage_site = relationship("HeritageSite", uselist=False, back_populates="contribution")
