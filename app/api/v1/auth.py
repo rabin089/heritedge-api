@@ -7,6 +7,10 @@ from app.schemas.users import UserCreate, UserOut, Token
 from app.models.user import User
 from app.core.security import hash_password, verify_password, create_access_token, SECRET_KEY, ALGORITHM, \
     create_refresh_token
+import os
+import secrets
+import firebase_admin
+from firebase_admin import auth as firebase_auth, credentials as firebase_credentials
 
 router = APIRouter()
 def get_db():
@@ -109,5 +113,67 @@ def refresh_token(refresh_token: str = Body(...), db: Session = Depends(get_db))
         "token_type": "bearer"
     }
 
+
+
+# --- Firebase Admin initialization (lazy) ---
+_firebase_initialized = False
+
+def _init_firebase_if_needed():
+    global _firebase_initialized
+    if _firebase_initialized:
+        return
+    try:
+        # Prefer explicit credentials path via env var, else default credentials
+        cred_path = os.getenv("FIREBASE_CREDENTIALS")
+        if cred_path and os.path.exists(cred_path):
+            firebase_admin.initialize_app(firebase_credentials.Certificate(cred_path))
+        else:
+            # This uses GOOGLE_APPLICATION_CREDENTIALS or ambient environment if running on GCP
+            firebase_admin.initialize_app()
+        _firebase_initialized = True
+    except Exception as e:
+        # Defer raising until an endpoint actually requires Firebase
+        raise HTTPException(status_code=500, detail={"error_code": "FIREBASE_INIT_FAILED", "message": str(e)})
+
+
+@router.post("/auth/google", response_model=Token)
+def google_login(payload: dict = Body(...), db: Session = Depends(get_db)):
+    """Accepts Firebase ID token, verifies it, and returns app JWTs.
+
+    Request body: { "firebase_id_token": "<token>" }
+    """
+    _init_firebase_if_needed()
+
+    firebase_id_token = payload.get("firebase_id_token")
+    if not firebase_id_token:
+        raise HTTPException(status_code=400, detail={"error_code": "MISSING_TOKEN", "message": "firebase_id_token is required"})
+
+    try:
+        decoded = firebase_auth.verify_id_token(firebase_id_token)
+    except Exception:
+        raise HTTPException(status_code=401, detail={"error_code": "INVALID_FIREBASE_TOKEN", "message": "Invalid or expired Firebase ID token"})
+
+    email = decoded.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail={"error_code": "EMAIL_NOT_PRESENT", "message": "No email in Firebase token"})
+
+    # Upsert user by email
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # Create a random password since social users don't log in with password
+        random_pwd = secrets.token_urlsafe(32)
+        hashed_pw = hash_password(random_pwd)
+        user = User(email=email, hashed_password=hashed_pw)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    access_token = create_access_token(data={"sub": user.email})
+    refresh_token = create_refresh_token(data={"sub": user.email})
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
 
 
