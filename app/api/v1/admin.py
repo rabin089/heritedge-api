@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime, timezone
 
 from app.core.database import SessionLocal
 from app.api.v1.auth import get_current_user
@@ -11,6 +12,8 @@ from ._role import is_superadmin, is_admin, is_reviewer
 from app.schemas.contribution import ContributionOut
 from app.models.contribution import ContributionStatus
 from app.crud import contributions as contrib_crud
+from app.crud import heritage_site as heritage_crud
+from app.schemas.heritage_site import HeritageSiteCreate, HeritageSiteOut
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -142,3 +145,32 @@ def user_contribution_history(
         "page": page,
         "page_size": page_size,
     }
+
+
+# ADMIN: create heritage site directly (no approval needed)
+@router.post("/heritage-sites", response_model=HeritageSiteOut)
+def create_heritage_site_direct(
+    site_data: HeritageSiteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a heritage site directly without going through contribution approval process.
+    Only admins can use this endpoint for adding popular/official sites."""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    # Create heritage site directly as approved (not pending)
+    site = heritage_crud.create_heritage_site(
+        db=db,
+        site_data=site_data,
+        user_id=current_user.email,  # Use admin's email as creator
+        contribution_id=None  # No contribution since it's direct creation
+    )
+    
+    # Set audit fields for direct admin creation
+    site.approved_by = current_user.email
+    site.approved_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(site)
+    
+    return site

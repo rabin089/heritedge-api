@@ -22,11 +22,10 @@ class HeritageSiteCreate(HeritageSiteBase):
 
 
 class HeritageSiteOut(HeritageSiteBase):
-    id: int
-    public_id: UUID
+    id: UUID
     created_by: str
     created_at: datetime
-    contribution_id: Optional[int] = None
+    contribution_id: Optional[UUID] = None
     is_pending: bool = False
 
     class Config:

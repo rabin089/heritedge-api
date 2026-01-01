@@ -68,6 +68,12 @@ python -m venv .venv
 .venv\Scripts\alembic upgrade head
 ```
 
+**Note**: The migration automatically creates initial admin users:
+- **Superadmin**: `heritedgenepal@gmail.com` / `SuperAdmin123!`
+- **Admin**: `admin@heritedgenepal.com` / `Admin123!`
+
+⚠️ **Important**: Change these default passwords in production!
+
 ## Running the API
 
 ```

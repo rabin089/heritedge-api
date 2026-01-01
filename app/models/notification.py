@@ -1,12 +1,14 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
+from sqlalchemy import Column, String, Text, DateTime, Boolean
+from sqlalchemy.dialects.postgresql import UUID
 from app.core.database import Base
+import uuid
 
 
 class Notification(Base):
     __tablename__ = "notifications"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     # Target user is referenced by email to align with Contribution.created_by
     recipient_email = Column(String, nullable=False, index=True)
     # Types: contribution_approved | contribution_rejected | admin_note
