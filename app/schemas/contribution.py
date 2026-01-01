@@ -30,8 +30,7 @@ class ContributionUpdate(ContributionBase):
 
 
 class ContributionOut(ContributionBase):
-    id: int
-    public_id: UUID
+    id: UUID
     status: ContributionStatus
     status_reason: Optional[str] = None
     rejection_reason: Optional[str] = None
@@ -53,5 +52,5 @@ class RejectContributionIn(BaseModel):
 
 class ApproveContributionOut(BaseModel):
     message: str
-    contribution_id: int
-    heritage_site_id: int
+    contribution_id: UUID
+    heritage_site_id: UUID

@@ -187,7 +187,6 @@ def get_popular_sites(db: Session, limit: int = 10, by_reviews: bool = True):
         # Most reviewed sites
         query = db.query(
             HeritageSite.id,
-            HeritageSite.public_id,
             HeritageSite.name,
             HeritageSite.category,
             HeritageSite.region,
@@ -200,14 +199,13 @@ def get_popular_sites(db: Session, limit: int = 10, by_reviews: bool = True):
                 HeritageSite.is_pending == False
             )
         ).group_by(
-            HeritageSite.id, HeritageSite.public_id, HeritageSite.name,
+            HeritageSite.id, HeritageSite.name,
             HeritageSite.category, HeritageSite.region, HeritageSite.image_url
         ).order_by(func.count(SiteReview.id).desc()).limit(limit)
     else:
         # Highest rated sites
         query = db.query(
             HeritageSite.id,
-            HeritageSite.public_id,
             HeritageSite.name,
             HeritageSite.category,
             HeritageSite.region,
@@ -220,7 +218,7 @@ def get_popular_sites(db: Session, limit: int = 10, by_reviews: bool = True):
                 HeritageSite.is_pending == False
             )
         ).group_by(
-            HeritageSite.id, HeritageSite.public_id, HeritageSite.name,
+            HeritageSite.id, HeritageSite.name,
             HeritageSite.category, HeritageSite.region, HeritageSite.image_url
         ).order_by(func.avg(SiteRating.rating).desc()).limit(limit)
     

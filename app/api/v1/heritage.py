@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, List
 from sqlalchemy.orm import Session
+from uuid import UUID
 from app.core.database import SessionLocal
 from app.schemas.heritage_site import HeritageSiteCreate, HeritageSiteOut
 from app.crud import heritage_site as crud
@@ -62,7 +63,7 @@ def get_sites_secured(
 # PUBLIC: get by id
 @router.get("/{site_id}", response_model=HeritageSiteOut)
 def get_site_by_id(
-    site_id: int,
+    site_id: UUID,
     db: Session = Depends(get_db),
 ):
     site = crud.get_site_by_id(db, site_id)
@@ -71,22 +72,10 @@ def get_site_by_id(
     return site
 
 
-# PUBLIC: get by public UUID (opaque id)
-@router.get("/by-public/{public_id}", response_model=HeritageSiteOut)
-def get_site_by_public_id(
-    public_id: str,
-    db: Session = Depends(get_db),
-):
-    site = crud.get_site_by_public_id(db, public_id)
-    if not site:
-        raise HTTPException(status_code=404, detail="Site not found")
-    return site
-
-
 # ADMIN: update site
 @router.put("/{site_id}", response_model=HeritageSiteOut)
 def update_site(
-    site_id: int,
+    site_id: UUID,
     site_data: HeritageSiteCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -106,7 +95,7 @@ def update_site(
 # ADMIN: delete site
 @router.delete("/{site_id}")
 def delete_site(
-    site_id: int,
+    site_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

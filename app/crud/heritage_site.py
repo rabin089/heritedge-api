@@ -77,19 +77,6 @@ def get_site_by_id(db: Session, site_id: UUID):
     )
 
 
-def get_site_by_public_id(db: Session, public_id: str):
-    # Public detail should only resolve approved entries
-    return (
-        db.query(HeritageSite)
-        .filter(
-            HeritageSite.public_id == public_id,
-            HeritageSite.is_pending == False,
-            HeritageSite.is_deleted == False,
-        )
-        .first()
-    )
-
-
 def delete_site(db: Session, site_id: UUID, acting_user_id: str | int):
     site = db.query(HeritageSite).filter(HeritageSite.id == site_id).first()
     if site and not site.is_deleted:

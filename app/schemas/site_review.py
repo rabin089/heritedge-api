@@ -75,7 +75,6 @@ class SiteReviewStats(BaseModel):
 
 class PopularSite(BaseModel):
     id: UUID
-    public_id: UUID
     name: str
     category: Optional[str] = None
     region: Optional[str] = None
@@ -90,8 +89,7 @@ class PopularSite(BaseModel):
 
 class HeritageSiteWithReviews(BaseModel):
     # Basic heritage site fields
-    id: int
-    public_id: UUID
+    id: UUID
     name: str
     description: Optional[str] = None
     category: Optional[str] = None

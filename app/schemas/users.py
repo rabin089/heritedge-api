@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Literal
+from uuid import UUID
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -9,7 +10,7 @@ class AdminCreate(UserCreate):
     role: Literal["user", "admin", "superadmin", "reviewer"] = "user"
 
 class UserOut(BaseModel):
-    id: int
+    id: UUID
     email: EmailStr
     is_active: bool
     is_admin: bool
