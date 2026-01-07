@@ -1,0 +1,68 @@
+version: '3.8'
+
+# Server-side Docker Compose
+# Use this on your server to run the application with database
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: heritedge_db
+    environment:
+      POSTGRES_DB: heritedge
+      POSTGRES_USER: heritedge_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - heritedge-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U heritedge_user -d heritedge"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Application (from Docker Hub)
+  backend:
+    image: ${DOCKER_HUB_USERNAME}/heritedge-backend:${TAG}
+    container_name: heritedge_backend
+    environment:
+      DATABASE_URL: postgresql://heritedge_user:${POSTGRES_PASSWORD}@db:5432/heritedge
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    ports:
+      - "8000:8000"
+    networks:
+      - heritedge-network
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        python -c 'import time; time.sleep(5)' &&
+        echo 'Running migrations...' &&
+        alembic upgrade head &&
+        echo 'Seeding initial data...' &&
+        python -m app.seed_data &&
+        echo 'Starting application...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+
+  # Redis (optional, for caching)
+  redis:
+    image: redis:7-alpine
+    container_name: heritedge_redis
+    networks:
+      - heritedge-network
+    restart: unless-stopped
+
+networks:
+  heritedge-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

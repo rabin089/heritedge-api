@@ -8,6 +8,13 @@ from app.schemas.site_review import SiteReviewCreate, SiteReviewUpdate, SiteRati
 from datetime import datetime, timezone
 
 
+def is_admin_or_superadmin(db: Session, user_email: str) -> bool:
+    """Check if user is admin or superadmin"""
+    from app.models.user import User
+    user = db.query(User).filter(User.email == user_email).first()
+    return user and user.role in ['admin', 'superadmin']
+
+
 def can_user_review_site(db: Session, site_id: UUID, user_email: str) -> bool:
     """Check if user can review a site (not their own contribution)"""
     # Check if user contributed this site
@@ -234,3 +241,186 @@ def get_user_reviews(db: Session, user_email: str, page: int = 1, page_size: int
     reviews = query.order_by(SiteReview.created_at.desc()).offset(offset).limit(page_size).all()
     
     return reviews, total
+
+
+# ==================== ADMIN REVIEW MANAGEMENT ====================
+
+def admin_delete_review(db: Session, review_id: UUID, admin_email: str):
+    """Admin can delete any review"""
+    if not is_admin_or_superadmin(db, admin_email):
+        return None
+    
+    review = db.query(SiteReview).filter(SiteReview.id == review_id).first()
+    if not review:
+        return None
+    
+    # Store review info for audit trail
+    review_info = {
+        'deleted_by': admin_email,
+        'deleted_at': datetime.now(timezone.utc),
+        'original_review': {
+            'id': review.id,
+            'user_email': review.user_email,
+            'rating': review.rating,
+            'comment': review.comment,
+            'site_id': review.site_id
+        }
+    }
+    
+    db.delete(review)
+    db.commit()
+    return review_info
+
+
+def admin_update_review(db: Session, review_id: UUID, review_data: SiteReviewUpdate, admin_email: str):
+    """Admin can update any review"""
+    if not is_admin_or_superadmin(db, admin_email):
+        return None
+    
+    review = db.query(SiteReview).filter(SiteReview.id == review_id).first()
+    if not review:
+        return None
+    
+    # Store original values for audit trail
+    original_values = {
+        'rating': review.rating,
+        'comment': review.comment,
+        'updated_by': admin_email,
+        'updated_at': datetime.now(timezone.utc)
+    }
+    
+    # Update review
+    if review_data.comment is not None:
+        review.comment = review_data.comment
+    if review_data.rating is not None:
+        review.rating = review_data.rating
+    
+    review.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(review)
+    
+    return review, original_values
+
+
+def admin_delete_rating(db: Session, rating_id: UUID, admin_email: str):
+    """Admin can delete any rating"""
+    if not is_admin_or_superadmin(db, admin_email):
+        return None
+    
+    rating = db.query(SiteRating).filter(SiteRating.id == rating_id).first()
+    if not rating:
+        return None
+    
+    # Store rating info for audit trail
+    rating_info = {
+        'deleted_by': admin_email,
+        'deleted_at': datetime.now(timezone.utc),
+        'original_rating': {
+            'id': rating.id,
+            'user_email': rating.user_email,
+            'rating': rating.rating,
+            'site_id': rating.site_id
+        }
+    }
+    
+    db.delete(rating)
+    db.commit()
+    return rating_info
+
+
+def admin_update_rating(db: Session, rating_id: UUID, new_rating: int, admin_email: str):
+    """Admin can update any rating"""
+    if not is_admin_or_superadmin(db, admin_email):
+        return None
+    
+    if new_rating < 0 or new_rating > 10:
+        return None
+    
+    rating = db.query(SiteRating).filter(SiteRating.id == rating_id).first()
+    if not rating:
+        return None
+    
+    # Store original value for audit trail
+    original_value = rating.rating
+    
+    rating.rating = new_rating
+    rating.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(rating)
+    
+    return rating, original_value
+
+
+def admin_get_all_reviews(db: Session, page: int = 1, page_size: int = 50, 
+                         site_id: UUID = None, user_email: str = None):
+    """Admin can get all reviews with optional filters"""
+    query = db.query(SiteReview)
+    
+    if site_id:
+        query = query.filter(SiteReview.site_id == site_id)
+    if user_email:
+        query = query.filter(SiteReview.user_email == user_email)
+    
+    total = query.count()
+    offset = (page - 1) * page_size
+    reviews = query.order_by(SiteReview.created_at.desc()).offset(offset).limit(page_size).all()
+    
+    return reviews, total
+
+
+def admin_get_all_ratings(db: Session, page: int = 1, page_size: int = 50,
+                         site_id: UUID = None, user_email: str = None):
+    """Admin can get all ratings with optional filters"""
+    query = db.query(SiteRating)
+    
+    if site_id:
+        query = query.filter(SiteRating.site_id == site_id)
+    if user_email:
+        query = query.filter(SiteRating.user_email == user_email)
+    
+    total = query.count()
+    offset = (page - 1) * page_size
+    ratings = query.order_by(SiteRating.created_at.desc()).offset(offset).limit(page_size).all()
+    
+    return ratings, total
+
+
+def admin_get_review_stats(db: Session):
+    """Admin can get comprehensive review statistics"""
+    # Overall stats
+    total_reviews = db.query(func.count(SiteReview.id)).scalar()
+    total_ratings = db.query(func.count(SiteRating.id)).scalar()
+    avg_review_rating = db.query(func.avg(SiteReview.rating)).scalar()
+    avg_rating_value = db.query(func.avg(SiteRating.rating)).scalar()
+    
+    # Reviews by rating distribution
+    review_distribution = db.query(
+        SiteReview.rating,
+        func.count(SiteReview.id).label('count')
+    ).group_by(SiteReview.rating).all()
+    
+    # Most active reviewers
+    top_reviewers = db.query(
+        SiteReview.user_email,
+        func.count(SiteReview.id).label('review_count')
+    ).group_by(SiteReview.user_email).order_by(
+        func.count(SiteReview.id).desc()
+    ).limit(10).all()
+    
+    # Most reviewed sites
+    most_reviewed_sites = db.query(
+        HeritageSite.name,
+        func.count(SiteReview.id).label('review_count')
+    ).join(SiteReview).group_by(
+        HeritageSite.id, HeritageSite.name
+    ).order_by(func.count(SiteReview.id).desc()).limit(10).all()
+    
+    return {
+        'total_reviews': total_reviews or 0,
+        'total_ratings': total_ratings or 0,
+        'average_review_rating': float(avg_review_rating) if avg_review_rating else 0,
+        'average_rating_value': float(avg_rating_value) if avg_rating_value else 0,
+        'review_distribution': [{'rating': r, 'count': c} for r, c in review_distribution],
+        'top_reviewers': [{'email': email, 'count': count} for email, count in top_reviewers],
+        'most_reviewed_sites': [{'site_name': name, 'count': count} for name, count in most_reviewed_sites]
+    }

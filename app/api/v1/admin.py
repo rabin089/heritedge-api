@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
+from uuid import UUID
 
 from app.core.database import SessionLocal
 from app.api.v1.auth import get_current_user
@@ -14,6 +15,13 @@ from app.models.contribution import ContributionStatus
 from app.crud import contributions as contrib_crud
 from app.crud import heritage_site as heritage_crud
 from app.schemas.heritage_site import HeritageSiteCreate, HeritageSiteOut
+from app.schemas.site_review import (
+    AdminReviewUpdate, AdminRatingUpdate, AdminAuditInfo,
+    AdminReviewUpdateResponse, AdminRatingUpdateResponse,
+    AdminReviewStats, AdminReviewList, AdminRatingList,
+    SiteReviewOut, SiteRatingOut
+)
+from app.crud import site_review as review_crud
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -174,3 +182,210 @@ def create_heritage_site_direct(
     db.refresh(site)
     
     return site
+
+
+# ==================== ADMIN REVIEW MANAGEMENT ====================
+
+# ADMIN: Delete any review
+@router.delete("/reviews/{review_id}", response_model=AdminAuditInfo)
+def admin_delete_review(
+    review_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can delete any review with audit trail"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    result = review_crud.admin_delete_review(db, review_id, current_user.email)
+    if not result:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    return AdminAuditInfo(**result)
+
+
+# ADMIN: Update any review
+@router.put("/reviews/{review_id}", response_model=AdminReviewUpdateResponse)
+def admin_update_review(
+    review_id: UUID,
+    review_data: AdminReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can update any review with audit trail"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    result = review_crud.admin_update_review(db, review_id, review_data, current_user.email)
+    if not result:
+        raise HTTPException(status_code=404, detail="Review not found")
+    
+    review, original_values = result
+    return AdminReviewUpdateResponse(
+        review=SiteReviewOut.model_validate(review),
+        original_values=original_values
+    )
+
+
+# ADMIN: Delete any rating
+@router.delete("/ratings/{rating_id}", response_model=AdminAuditInfo)
+def admin_delete_rating(
+    rating_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can delete any rating with audit trail"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    result = review_crud.admin_delete_rating(db, rating_id, current_user.email)
+    if not result:
+        raise HTTPException(status_code=404, detail="Rating not found")
+    
+    return AdminAuditInfo(**result)
+
+
+# ADMIN: Update any rating
+@router.put("/ratings/{rating_id}", response_model=AdminRatingUpdateResponse)
+def admin_update_rating(
+    rating_id: UUID,
+    rating_data: AdminRatingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can update any rating with audit trail"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    result = review_crud.admin_update_rating(db, rating_id, rating_data.rating, current_user.email)
+    if not result:
+        raise HTTPException(status_code=404, detail="Rating not found")
+    
+    rating, original_value = result
+    return AdminRatingUpdateResponse(
+        rating=SiteRatingOut.model_validate(rating),
+        original_value=original_value
+    )
+
+
+# ADMIN: Get all reviews with filters
+@router.get("/reviews", response_model=AdminReviewList)
+def admin_get_all_reviews(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    site_id: Optional[UUID] = Query(None),
+    user_email: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can get all reviews with optional filters"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    result = review_crud.admin_get_all_reviews(db, page, page_size, site_id, user_email)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to retrieve reviews")
+    
+    reviews, total = result
+    return AdminReviewList(
+        reviews=[SiteReviewOut.model_validate(review) for review in reviews],
+        total=total,
+        page=page,
+        page_size=page_size
+    )
+
+
+# ADMIN: Get all ratings with filters
+@router.get("/ratings", response_model=AdminRatingList)
+def admin_get_all_ratings(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    site_id: Optional[UUID] = Query(None),
+    user_email: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can get all ratings with optional filters"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    result = review_crud.admin_get_all_ratings(db, page, page_size, site_id, user_email)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to retrieve ratings")
+    
+    ratings, total = result
+    return AdminRatingList(
+        ratings=[SiteRatingOut.model_validate(rating) for rating in ratings],
+        total=total,
+        page=page,
+        page_size=page_size
+    )
+
+
+# ADMIN: Get comprehensive review statistics
+@router.get("/reviews/stats", response_model=AdminReviewStats)
+def admin_get_review_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can get comprehensive review statistics"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    stats = review_crud.admin_get_review_stats(db)
+    if not stats:
+        raise HTTPException(status_code=500, detail="Failed to retrieve statistics")
+    
+    return AdminReviewStats(**stats)
+
+
+# ADMIN: Get user's review history
+@router.get("/users/{user_email}/reviews", response_model=AdminReviewList)
+def admin_get_user_reviews(
+    user_email: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can get any user's review history"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    result = review_crud.admin_get_all_reviews(db, page, page_size, user_email=user_email)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to retrieve user reviews")
+    
+    reviews, total = result
+    return AdminReviewList(
+        reviews=[SiteReviewOut.model_validate(review) for review in reviews],
+        total=total,
+        page=page,
+        page_size=page_size
+    )
+
+
+# ADMIN: Get user's rating history
+@router.get("/users/{user_email}/ratings", response_model=AdminRatingList)
+def admin_get_user_ratings(
+    user_email: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can get any user's rating history"""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    result = review_crud.admin_get_all_ratings(db, page, page_size, user_email=user_email)
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to retrieve user ratings")
+    
+    ratings, total = result
+    return AdminRatingList(
+        ratings=[SiteRatingOut.model_validate(rating) for rating in ratings],
+        total=total,
+        page=page,
+        page_size=page_size
+    )
