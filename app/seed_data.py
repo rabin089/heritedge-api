@@ -6,6 +6,10 @@ from app.core.database import SessionLocal
 from app.models.user import User
 from app.core.security import hash_password
 import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
 def create_initial_users(db: Session):

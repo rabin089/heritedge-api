@@ -1,6 +1,11 @@
 from minio import Minio
 from urllib.parse import urljoin
 import os
+from io import BytesIO
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY")
@@ -17,10 +22,12 @@ client = Minio(
 )
 
 def upload_file(file_obj: bytes, object_name: str, content_type: str = "application/octet-stream"):
+    # Convert bytes to file-like object
+    file_data = BytesIO(file_obj)
     client.put_object(
         bucket_name=MINIO_BUCKET,
         object_name=object_name,
-        data=file_obj,
+        data=file_data,
         length=len(file_obj),
         content_type=content_type,
     )
