@@ -33,6 +33,9 @@ class Contribution(Base):
     # unified status reason to record approval comment or rejection reason
     status_reason = Column(Text, nullable=True)
     rejection_reason = Column(Text, nullable=True)
+    
+    # Festival association
+    festival_id = Column(UUID(as_uuid=True), ForeignKey("festivals.id"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     created_by = Column(String, nullable=False)  # user id or email (your existing type)
@@ -50,3 +53,4 @@ class Contribution(Base):
 
     # backref from HeritageSite if approved (optional relationship)
     heritage_site = relationship("HeritageSite", uselist=False, back_populates="contribution")
+    festival = relationship("Festival", back_populates="contributions")

@@ -1,0 +1,222 @@
+from typing import List, Optional, Dict, Any
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_, func, text, cast
+from sqlalchemy.dialects.postgresql import JSONB
+from app.models.festival import Festival, FestivalHeritageSite, FestivalStatus, FestivalCategory
+from app.models.heritage_site import HeritageSite
+from app.schemas.festival import FestivalCreate, FestivalUpdate, FestivalHeritageSiteCreate
+from uuid import UUID
+import uuid
+
+
+class FestivalCRUD:
+    def get(self, db: Session, festival_id: UUID) -> Optional[Festival]:
+        """Get a festival by ID"""
+        return db.query(Festival).filter(Festival.id == festival_id).first()
+
+    def get_multi(
+        self,
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        region: Optional[str] = None,
+        category: Optional[FestivalCategory] = None,
+        status: Optional[FestivalStatus] = None,
+        tag: Optional[str] = None,
+        q: Optional[str] = None,
+        is_approved: Optional[bool] = None, # Legacy support or mapping
+    ) -> tuple[List[Festival], int]:
+        """Get multiple festivals with filters and pagination"""
+        query = db.query(Festival)
+        
+        # Apply filters
+        if region:
+            query = query.filter(Festival.region.ilike(f"%{region}%"))
+        
+        if category:
+            query = query.filter(Festival.category == category)
+        
+        if status:
+            query = query.filter(Festival.status == status)
+        
+        if tag:
+            # Assumes tags is ARRAY(String)
+            query = query.filter(func.array_to_string(Festival.tags, ',').ilike(f"%{tag}%"))
+        
+        # Map is_approved to status for backward compatibility if needed, 
+        # or just rely on status param. 
+        # If both present, status takes precedence or we intersect?
+        # Let's assume user might pass is_approved=True for "Approved"
+        if status is None and is_approved is not None:
+            if is_approved:
+                query = query.filter(Festival.status == FestivalStatus.approved)
+            else:
+                query = query.filter(Festival.status != FestivalStatus.approved)
+        
+        if q:
+            # Fuzzy search across multiple fields
+            # internal JSON casting for search might be heavy, skipping locations search for now or just name/desc
+            search_filter = or_(
+                Festival.name.ilike(f"%{q}%"),
+                Festival.description.ilike(f"%{q}%"),
+                Festival.significance.ilike(f"%{q}%"),
+                # Festival.region.ilike(f"%{q}%"), # Include region in global search?
+            )
+            query = query.filter(search_filter)
+        
+        # Get total count
+        total = query.count()
+        
+        # Apply pagination
+        festivals = query.offset(skip).limit(limit).all()
+        
+        return festivals, total
+
+    def create(self, db: Session, obj_in: FestivalCreate, created_by: str) -> Festival:
+        """Create a new festival"""
+        # Convert created_by str to UUID if needed, DB expects UUID
+        # obj_in locations is List[LatLng], Pydantic handles it, DB expects JSONB compatible list of dicts.
+        # .model_dump() usually converts sub-models to dicts which is perfect for JSONB.
+        
+        db_obj = Festival(
+            **obj_in.model_dump(),
+            created_by=UUID(created_by),
+            status=FestivalStatus.pending
+        )
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def update(
+        self,
+        db: Session,
+        db_obj: Festival,
+        obj_in: FestivalUpdate,
+        updated_by: str
+    ) -> Festival:
+        """Update a festival"""
+        # updated_by kept in audit logic but user schema didn't have updated_by/at fields.
+        # I removed them from model. So I can't set them.
+        # I will just update fields.
+        
+        update_data = obj_in.model_dump(exclude_unset=True)
+        # update_data["updated_by"] = updated_by # Field removed
+        
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+        
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def approve(
+        self,
+        db: Session,
+        festival_id: UUID,
+        approved_by: str,
+        approval_reason: Optional[str] = None
+    ) -> Optional[Festival]:
+        """Approve a festival"""
+        festival = self.get(db, festival_id)
+        if festival:
+            festival.status = FestivalStatus.approved
+            # approved_by/at fields removed from user schema request.
+            # If I want to track it, I can't.
+            # Just set status.
+            db.commit()
+            db.refresh(festival)
+        return festival
+
+    def reject(
+        self,
+        db: Session,
+        festival_id: UUID,
+        approved_by: str,
+        rejection_reason: str
+    ) -> Optional[Festival]:
+        """Reject a festival"""
+        festival = self.get(db, festival_id)
+        if festival:
+            festival.status = FestivalStatus.rejected
+            # Store rejection reason? No field in user schema.
+            # User schema: status: Enum (pending, approved, rejected). No reason field.
+            # I can't store reason unless I deviate.
+            # I'll stick to schema.
+            db.commit()
+            db.refresh(festival)
+        return festival
+
+    def delete(self, db: Session, festival_id: UUID) -> bool:
+        """Hard delete a festival"""
+        festival = self.get(db, festival_id)
+        if festival:
+            db.delete(festival)
+            db.commit()
+            return True
+        return False
+
+    def get_upcoming_festivals(self, db: Session, limit: int = 10) -> List[Festival]:
+        """Get upcoming approved festivals"""
+        return db.query(Festival).filter(
+            and_(
+                Festival.status == FestivalStatus.approved,
+                Festival.start_date > func.now()
+            )
+        ).order_by(Festival.start_date).limit(limit).all()
+
+    def get_ongoing_festivals(self, db: Session) -> List[Festival]:
+        """Get currently ongoing approved festivals"""
+        now = func.now()
+        return db.query(Festival).filter(
+            and_(
+                Festival.status == FestivalStatus.approved,
+                Festival.start_date <= now,
+                Festival.end_date >= now
+            )
+        ).all()
+
+
+class FestivalHeritageSiteCRUD:
+    def create(self, db: Session, obj_in: FestivalHeritageSiteCreate, created_by: str) -> FestivalHeritageSite:
+        """Create a festival-heritage site relationship"""
+        db_obj = FestivalHeritageSite(
+            **obj_in.model_dump(),
+            created_by=created_by
+        )
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def get_by_festival(self, db: Session, festival_id: UUID) -> List[FestivalHeritageSite]:
+        """Get all heritage sites associated with a festival"""
+        return db.query(FestivalHeritageSite).filter(
+            FestivalHeritageSite.festival_id == festival_id
+        ).all()
+
+    def get_by_heritage_site(self, db: Session, heritage_site_id: UUID) -> List[FestivalHeritageSite]:
+        """Get all festivals associated with a heritage site"""
+        return db.query(FestivalHeritageSite).filter(
+            FestivalHeritageSite.heritage_site_id == heritage_site_id
+        ).all()
+
+    def remove(self, db: Session, festival_id: UUID, heritage_site_id: UUID) -> bool:
+        """Remove a festival-heritage site relationship"""
+        relationship = db.query(FestivalHeritageSite).filter(
+            and_(
+                FestivalHeritageSite.festival_id == festival_id,
+                FestivalHeritageSite.heritage_site_id == heritage_site_id
+            )
+        ).first()
+        
+        if relationship:
+            db.delete(relationship)
+            db.commit()
+            return True
+        return False
+
+
+# Create singleton instances
+festival_crud = FestivalCRUD()
+festival_heritage_site_crud = FestivalHeritageSiteCRUD()

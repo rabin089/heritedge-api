@@ -39,3 +39,4 @@ class HeritageSite(Base):
     contribution = relationship("Contribution", back_populates="heritage_site")
     reviews = relationship("SiteReview", back_populates="heritage_site", cascade="all, delete-orphan")
     ratings = relationship("SiteRating", back_populates="heritage_site", cascade="all, delete-orphan")
+    festivals = relationship("Festival", secondary="festival_heritage_sites", back_populates="heritage_sites")

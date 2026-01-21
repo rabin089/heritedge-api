@@ -16,6 +16,7 @@ class ContributionBase(BaseModel):
     image_url: Optional[str] = None
     secondary_images: Optional[List[str]] = None
     tags: Optional[List[str]] = None
+    festival_id: Optional[UUID] = None
 
 
 class ContributionCreate(ContributionBase):
@@ -27,6 +28,7 @@ class ContributionUpdate(ContributionBase):
     name: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    festival_id: Optional[UUID] = None
 
 
 class ContributionOut(ContributionBase):
