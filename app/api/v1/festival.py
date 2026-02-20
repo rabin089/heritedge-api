@@ -15,7 +15,7 @@ from app.api.v1._role import is_admin, is_reviewer
 from app.api.v1.auth import get_current_user
 from app.models.user import User
 
-router = APIRouter()
+router = APIRouter(tags=["festival"])
 
 
 def get_db():
