@@ -72,14 +72,22 @@ def create_user(
 # SUPERADMIN: update a user's role
 @router.put("/users/{user_id}/role", response_model=UserOut)
 def update_role(
-    user_id: int,
+    user_id: str,  # Changed from int to str to accept UUID
     payload: RoleUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not is_superadmin(current_user):
         raise HTTPException(status_code=403, detail="Superadmin only")
-    user = db.query(User).filter(User.id == user_id).first()
+    
+    # Convert string to UUID for database query
+    try:
+        from uuid import UUID
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
+    user = db.query(User).filter(User.id == user_uuid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.role = payload.role
@@ -92,13 +100,21 @@ def update_role(
 # SUPERADMIN: delete user
 @router.delete("/users/{user_id}")
 def delete_user(
-    user_id: int,
+    user_id: str,  # Changed from int to str to accept UUID
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not is_superadmin(current_user):
         raise HTTPException(status_code=403, detail="Superadmin only")
-    user = db.query(User).filter(User.id == user_id).first()
+    
+    # Convert string to UUID for database query
+    try:
+        from uuid import UUID
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
+    user = db.query(User).filter(User.id == user_uuid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     db.delete(user)
@@ -132,7 +148,7 @@ def list_pending_contributions(
 # ADMIN/REVIEWER: user contribution history with optional status filter + pagination
 @router.get("/user/{user_id}/contributions")
 def user_contribution_history(
-    user_id: int,
+    user_id: str,  
     status: Optional[ContributionStatus] = Query(default=None),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
@@ -141,13 +157,22 @@ def user_contribution_history(
 ):
     if not (is_admin(current_user) or is_reviewer(current_user)):
         raise HTTPException(status_code=403, detail="Admin or reviewer only")
-    u = db.query(User).filter(User.id == user_id).first()
+    
+    # Convert string to UUID for database query
+    try:
+        from uuid import UUID
+        user_uuid = UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+    
+    u = db.query(User).filter(User.id == user_uuid).first()
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
     items, total = contrib_crud.admin_user_contribution_history(db, u.email, page, page_size, status)
     return {
         "user_id": u.id,
         "user_email": u.email,
+        "user_name": u.display_name,  # Use display_name for admin identity
         "items": [ContributionOut.model_validate(i) for i in items],
         "total": total,
         "page": page,
