@@ -3,7 +3,7 @@ name: Deploy FastAPI to VPS
 on:
   push:
     branches:
-      - main
+      - dev
 
 jobs:
   deploy:
