@@ -2,38 +2,37 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from app.models.user_favorite import UserFavorite
 from app.models.heritage_site import HeritageSite
+from uuid import UUID
 
 
-def add_favorite(db: Session, user_id: int, heritage_site_id: int) -> bool:
+def add_favorite(db: Session, user_id: UUID, heritage_site_id: UUID) -> bool:
     fav = UserFavorite(user_id=user_id, heritage_site_id=heritage_site_id)
     db.add(fav)
     try:
         db.commit()
         return True
-    except IntegrityError:
+    except:
         db.rollback()
-        # already exists or FK issue
-        # Treat duplicate as success (idempotent add)
-        return True
+        return False
 
 
-def remove_favorite(db: Session, user_id: int, heritage_site_id: int) -> bool:
+def remove_favorite(db: Session, user_id: UUID, heritage_site_id: UUID) -> bool:
     row = (
         db.query(UserFavorite)
         .filter(
             UserFavorite.user_id == user_id,
-            UserFavorite.heritage_site_id == heritage_site_id,
+            UserFavorite.heritage_site_id == heritage_site_id
         )
         .first()
     )
-    if not row:
-        return True  # idempotent remove
-    db.delete(row)
-    db.commit()
+    if row:
+        db.delete(row)
+        db.commit()
+        return True
     return True
 
 
-def list_favorites(db: Session, user_id: int):
+def list_favorites(db: Session, user_id: UUID):
     # join to sites and only return non-deleted, approved sites
     q = (
         db.query(HeritageSite)

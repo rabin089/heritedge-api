@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import any_
+from sqlalchemy.orm import Session
 from app.models.contribution import Contribution, ContributionStatus
 from app.models.heritage_site import HeritageSite
+from uuid import UUID
 from app.schemas.contribution import ContributionCreate, ContributionUpdate
 from app.schemas.heritage_site import HeritageSiteCreate
 from datetime import datetime, timezone
@@ -17,7 +18,7 @@ def create_contribution(db: Session, data: ContributionCreate, user_id: str):
     return row
 
 
-def get_contribution_by_id(db: Session, contrib_id: int):
+def get_contribution_by_id(db: Session, contrib_id: UUID):
     return db.query(Contribution).filter(Contribution.id == contrib_id).first()
 
 
@@ -99,39 +100,36 @@ def admin_user_contribution_history(
     return items, total
 
 
-def update_my_pending_contribution(db: Session, contrib_id: int, user_id: str, data: ContributionUpdate):
+def update_my_pending_contribution(db: Session, contrib_id: UUID, user_id: str, data: ContributionUpdate):
     row = db.query(Contribution).filter(
         Contribution.id == contrib_id,
         Contribution.created_by == user_id
     ).first()
-    if not row or row.status != ContributionStatus.pending:
+    if not row:
         return None
-
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(row, k, v)
-    row.updated_by = user_id
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
     return row
 
 
-def delete_my_pending_contribution(db: Session, contrib_id: int, user_id: str):
+def delete_my_pending_contribution(db: Session, contrib_id: UUID, user_id: str):
     row = db.query(Contribution).filter(
         Contribution.id == contrib_id,
         Contribution.created_by == user_id
     ).first()
-    if not row or row.status != ContributionStatus.pending:
+    if not row:
         return None
     row.is_deleted = True
-    row.deleted_by = user_id
     row.deleted_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
     return row
 
 
-def approve_contribution(db: Session, contrib_id: int, admin_user_id: str, comment: str | None = None):
+def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comment: str | None = None):
     row = db.query(Contribution).filter(Contribution.id == contrib_id).first()
     if not row or row.status != ContributionStatus.pending:
         return None
@@ -182,7 +180,7 @@ def approve_contribution(db: Session, contrib_id: int, admin_user_id: str, comme
     return row, site
 
 
-def reject_contribution(db: Session, contrib_id: int, reason: str, admin_user_id: str):
+def reject_contribution(db: Session, contrib_id: UUID, reason: str, admin_user_id: str):
     row = db.query(Contribution).filter(Contribution.id == contrib_id).first()
     if not row or row.status != ContributionStatus.pending:
         return None
@@ -207,7 +205,7 @@ def reject_contribution(db: Session, contrib_id: int, reason: str, admin_user_id
     return row
 
 
-def resubmit_rejected_contribution(db: Session, contrib_id: int, user_id: str, data: ContributionUpdate | None = None):
+def resubmit_rejected_contribution(db: Session, contrib_id: UUID, user_id: str, data: ContributionUpdate | None = None):
     row = db.query(Contribution).filter(
         Contribution.id == contrib_id,
         Contribution.created_by == user_id

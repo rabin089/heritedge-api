@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Float, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Float, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -9,8 +9,7 @@ import uuid
 class HeritageSite(Base):
     __tablename__ = "heritage_sites"
 
-    id = Column(Integer, primary_key=True, index=True)
-    public_id = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String, nullable=False)
     description = Column(Text)
     category = Column(String)
@@ -25,7 +24,7 @@ class HeritageSite(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     created_by = Column(String, nullable=False)           # original contributor user id/email
-    contribution_id = Column(Integer, ForeignKey("contributions.id"), nullable=True)
+    contribution_id = Column(UUID(as_uuid=True), ForeignKey("contributions.id"), nullable=True)
     # soft delete flag
     is_deleted = Column(Boolean, default=False, nullable=False)
 
@@ -38,3 +37,6 @@ class HeritageSite(Base):
     deleted_at = Column(DateTime(timezone=True), nullable=True)
 
     contribution = relationship("Contribution", back_populates="heritage_site")
+    reviews = relationship("SiteReview", back_populates="heritage_site", cascade="all, delete-orphan")
+    ratings = relationship("SiteRating", back_populates="heritage_site", cascade="all, delete-orphan")
+    festivals = relationship("Festival", secondary="festival_heritage_sites", back_populates="heritage_sites")

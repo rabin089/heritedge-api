@@ -1,17 +1,16 @@
 from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
+from uuid import UUID
 
 
 class NotificationOut(BaseModel):
-    id: int
-    recipient_email: str
-    type: str
+    id: UUID
+    user_email: str
     title: str
-    message: Optional[str] = None
-    created_at: datetime
-    read: bool
+    message: str
+    is_read: bool
     read_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

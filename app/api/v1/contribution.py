@@ -3,6 +3,7 @@ from typing import List, Optional
 import os
 from urllib.parse import urlparse
 from sqlalchemy.orm import Session
+from uuid import UUID
 from app.core.database import SessionLocal
 from app.api.v1.auth import get_current_user
 from app.models.user import User
@@ -98,7 +99,7 @@ def update_my_contribution(
 # user: delete my pending contribution
 @router.delete("/{contrib_id}")
 def delete_my_contribution(
-    contrib_id: int,
+    contrib_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -124,7 +125,7 @@ def list_contributions(
 # admin: approve
 @router.post("/{contrib_id}/approve", response_model=ApproveContributionOut)
 def approve_contribution(
-    contrib_id: int,
+    contrib_id: UUID,
     payload: ApproveContributionIn = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -142,7 +143,7 @@ def approve_contribution(
 # admin: reject
 @router.post("/{contrib_id}/reject", response_model=ContributionOut)
 def reject_contribution(
-    contrib_id: int,
+    contrib_id: UUID,
     payload: RejectContributionIn,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -164,7 +165,7 @@ def reject_contribution(
 # user: resubmit a rejected contribution (optional update data)
 @router.post("/{contrib_id}/resubmit", response_model=ContributionOut)
 def resubmit_contribution(
-    contrib_id: int,
+    contrib_id: UUID,
     payload: Optional[ContributionUpdate] = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

@@ -16,6 +16,7 @@ class ContributionBase(BaseModel):
     image_url: Optional[str] = None
     secondary_images: Optional[List[str]] = None
     tags: Optional[List[str]] = None
+    festival_id: Optional[UUID] = None
 
 
 class ContributionCreate(ContributionBase):
@@ -27,11 +28,11 @@ class ContributionUpdate(ContributionBase):
     name: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    festival_id: Optional[UUID] = None
 
 
 class ContributionOut(ContributionBase):
-    id: int
-    public_id: UUID
+    id: UUID
     status: ContributionStatus
     status_reason: Optional[str] = None
     rejection_reason: Optional[str] = None
@@ -53,5 +54,5 @@ class RejectContributionIn(BaseModel):
 
 class ApproveContributionOut(BaseModel):
     message: str
-    contribution_id: int
-    heritage_site_id: int
+    contribution_id: UUID
+    heritage_site_id: UUID

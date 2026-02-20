@@ -9,6 +9,10 @@ from app.core.database import Base
 from app.models import user
 from app.models import heritage_site
 from app.models import contribution
+from app.models import notification
+from app.models import user_favorite
+from app.models import site_review
+from app.models import festival
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
@@ -22,7 +26,13 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
+# from myapp import mymodel
+# target_metadata = mymodel.Base.metadata
 target_metadata = Base.metadata
+
+import os
+if os.getenv("DATABASE_URL"):
+    config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL"))
 
 
 

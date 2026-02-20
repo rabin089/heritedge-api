@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Float, Text, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, String, Float, Text, Boolean, DateTime, ForeignKey, Enum
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -16,8 +16,7 @@ class ContributionStatus(str, enum.Enum):
 class Contribution(Base):
     __tablename__ = "contributions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    public_id = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     # submitted content (same fields as heritage site)
     name = Column(String, nullable=False)
     description = Column(Text)
@@ -34,6 +33,9 @@ class Contribution(Base):
     # unified status reason to record approval comment or rejection reason
     status_reason = Column(Text, nullable=True)
     rejection_reason = Column(Text, nullable=True)
+    
+    # Festival association
+    festival_id = Column(UUID(as_uuid=True), ForeignKey("festivals.id"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     created_by = Column(String, nullable=False)  # user id or email (your existing type)
@@ -51,3 +53,4 @@ class Contribution(Base):
 
     # backref from HeritageSite if approved (optional relationship)
     heritage_site = relationship("HeritageSite", uselist=False, back_populates="contribution")
+    festival = relationship("Festival", back_populates="contributions")

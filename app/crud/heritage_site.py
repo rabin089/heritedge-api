@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import any_, func
+from uuid import UUID
 from app.models.heritage_site import HeritageSite
 from app.schemas.heritage_site import HeritageSiteCreate
 from datetime import datetime, timezone
@@ -9,7 +10,7 @@ def create_heritage_site(
     db: Session,
     site_data: HeritageSiteCreate,
     user_id: str,
-    contribution_id: int | None = None
+    contribution_id: UUID | None = None
 ):
     site = HeritageSite(
         **site_data.model_dump(),
@@ -68,7 +69,7 @@ def get_filtered_sites(
     return query.all()
 
 
-def get_site_by_id(db: Session, site_id: int):
+def get_site_by_id(db: Session, site_id: UUID):
     return (
         db.query(HeritageSite)
         .filter(HeritageSite.id == site_id, HeritageSite.is_deleted == False)
@@ -76,20 +77,7 @@ def get_site_by_id(db: Session, site_id: int):
     )
 
 
-def get_site_by_public_id(db: Session, public_id: str):
-    # Public detail should only resolve approved entries
-    return (
-        db.query(HeritageSite)
-        .filter(
-            HeritageSite.public_id == public_id,
-            HeritageSite.is_pending == False,
-            HeritageSite.is_deleted == False,
-        )
-        .first()
-    )
-
-
-def delete_site(db: Session, site_id: int, acting_user_id: str | int):
+def delete_site(db: Session, site_id: UUID, acting_user_id: str | int):
     site = db.query(HeritageSite).filter(HeritageSite.id == site_id).first()
     if site and not site.is_deleted:
         site.is_deleted = True
@@ -100,7 +88,7 @@ def delete_site(db: Session, site_id: int, acting_user_id: str | int):
     return site
 
 
-def update_heritage_site(db: Session, site_id: int, site_data: HeritageSiteCreate, acting_user_id: str | int | None = None):
+def update_heritage_site(db: Session, site_id: UUID, site_data: HeritageSiteCreate, acting_user_id: str | int | None = None):
     site = db.query(HeritageSite).filter(HeritageSite.id == site_id).first()
     if site:
         for k, v in site_data.model_dump(exclude_unset=True).items():

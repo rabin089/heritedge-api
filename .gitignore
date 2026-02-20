@@ -1,0 +1,34 @@
+# Environment variables
+.env
+.env.*
+
+# Service account / credentials (NEVER commit these)
+service_accounts/
+*.json
+!package.json
+!package-lock.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+
+# Docker
+.dockerignore
