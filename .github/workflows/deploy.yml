@@ -1,9 +1,9 @@
-name: CI/CD – Build & Deploy FastAPI via Docker + Tailscale
+name: CI/CD – Build & Deploy FastAPI via Docker + Tailscale (Auth Key)
 
 on:
   push:
     branches:
-      - dev   # change if needed
+      - dev
 
 jobs:
   build-and-deploy:
@@ -27,22 +27,49 @@ jobs:
           docker build -t rabin089/heritedge-backend:latest .
           docker push rabin089/heritedge-backend:latest
 
-      # 4️⃣ Connect GitHub runner to Tailscale
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v1
-        with:
-          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+      # 4️⃣ Install Tailscale
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
 
-      # 5️⃣ Verify Tailscale connection (debug, KEEP THIS)
+      # 5️⃣ Start tailscaled manually (NO systemd)
+      - name: Start tailscaled
+        run: |
+          sudo mkdir -p /var/lib/tailscale /var/run/tailscale
+
+          sudo tailscaled \
+            --state=/var/lib/tailscale/tailscaled.state \
+            --socket=/var/run/tailscale/tailscaled.sock \
+            > ~/tailscaled.log 2>&1 &
+
+          # Wait for socket
+          for i in {1..20}; do
+            if [ -S /var/run/tailscale/tailscaled.sock ]; then
+              echo "tailscaled is ready"
+              break
+            fi
+            sleep 0.5
+          done
+
+      # 6️⃣ Bring Tailscale up using AUTH KEY
+      - name: Connect to Tailscale (auth key)
+        run: |
+          sudo tailscale up \
+            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} \
+            --hostname=github-ci-${{ github.run_id }} \
+            --accept-dns=false \
+            --accept-routes=false
+
+      # 7️⃣ Verify Tailscale connection
       - name: Verify Tailscale
         run: |
-          tailscale status
-          ping -c 3 100.115.133.57
+          sudo tailscale status
+          sudo tailscale ping 100.115.133.57
 
-      # 6️⃣ Deploy via Tailscale SSH (NO appleboy, NO open SSH)
+      # 8️⃣ Deploy via Tailscale SSH
       - name: Deploy on server
         run: |
-          tailscale ssh ${{ secrets.SSH_USER }}@100.115.133.57 << 'EOF'
+          sudo tailscale ssh ${{ secrets.SSH_USER }}@100.115.133.57 << 'EOF'
             set -e
 
             echo "Connected via Tailscale SSH"
@@ -62,3 +89,9 @@ jobs:
 
             docker image prune -f
           EOF
+
+      # 9️⃣ Cleanup (important)
+      - name: Tailscale cleanup
+        if: always()
+        run: |
+          sudo tailscale down || true
