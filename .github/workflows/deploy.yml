@@ -22,7 +22,7 @@ jobs:
         with:
           host: ${{ secrets.SERVER_TAILSCALE_IP }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SSH_KEY }}
           port: 22
           script: |
             echo "Connected via Tailscale"
