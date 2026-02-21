@@ -3,7 +3,7 @@ name: CI/CD – Build & Deploy FastAPI via Docker + Tailscale
 on:
   push:
     branches:
-      - main   # change if needed
+      - dev   # change if needed
 
 jobs:
   build-and-deploy:
