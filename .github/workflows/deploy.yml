@@ -41,6 +41,8 @@ jobs:
 
       # 6️⃣ Deploy on server via Tailscale SSH
       - name: Deploy on server
+        env:
+          FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
         run: |
           tailscale ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
@@ -56,6 +58,7 @@ jobs:
               --restart unless-stopped \
               --network heritedge-db_default \
               --env-file /opt/heritedge/heritedge-api/.env \
+              -e FIREBASE_CREDENTIALS_JSON="$FIREBASE_CREDENTIALS_JSON" \
               -p 8000:8000 \
               rabin089/heritedge-backend:latest
 

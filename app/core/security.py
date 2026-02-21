@@ -7,6 +7,8 @@ import firebase_admin
 from firebase_admin import credentials, auth
 from fastapi import HTTPException
 
+import json
+
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -15,9 +17,18 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 REFRESH_TOKEN_EXPIRE_MINUTES= int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
 
 # Initialize Firebase Admin SDK
+# Option 1: Load from JSON string env var (recommended for production/Docker)
+# Option 2: Load from file path (for local development)
+firebase_cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
 cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
-if cred_path:
-    # Normalize path: replace Windows backslashes with forward slashes for Linux compatibility
+
+if firebase_cred_json:
+    # Parse the JSON string directly — no file needed
+    cred_dict = json.loads(firebase_cred_json)
+    cred = credentials.Certificate(cred_dict)
+    firebase_admin.initialize_app(cred)
+elif cred_path:
+    # Normalize path: replace Windows backslashes with forward slashes for Linux
     cred_path = cred_path.replace("\\", "/")
     cred = credentials.Certificate(cred_path)
     firebase_admin.initialize_app(cred)
