@@ -69,7 +69,7 @@ jobs:
       # 8️⃣ Deploy via Tailscale SSH
       - name: Deploy on server
         run: |
-          sudo tailscale ssh ${{ secrets.SSH_USER }}@100.115.133.57 << 'EOF'
+          sudo tailscale ssh "${{ secrets.SSH_USER }}@100.115.133.57" << 'EOF'
             set -e
 
             echo "Connected via Tailscale SSH"
