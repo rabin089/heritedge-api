@@ -1,31 +1,50 @@
-name: Deploy via Tailscale SSH
+name: CI/CD – Build & Deploy FastAPI via Docker + Tailscale
 
 on:
   push:
-    branches: [ dev ]
+    branches:
+      - dev   # change if needed
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # 1️⃣ Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2️⃣ Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 3️⃣ Build & push Docker image
+      - name: Build and push Docker image
+        run: |
+          docker build -t rabin089/heritedge-backend:latest .
+          docker push rabin089/heritedge-backend:latest
+
+      # 4️⃣ Connect GitHub runner to Tailscale
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-      - name: Verify Tailscale connection
+      # 5️⃣ Verify Tailscale connection (debug, KEEP THIS)
+      - name: Verify Tailscale
         run: |
           tailscale status
-          ping -c 3 rabindulal
+          ping -c 3 ${{ secrets.SERVER_IP }}
 
-      - name: Deploy backend
+      # 6️⃣ Deploy via Tailscale SSH (NO appleboy, NO open SSH)
+      - name: Deploy on server
         run: |
-          tailscale ssh rabin089@rabindulal << 'EOF'
+          tailscale ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
+
             echo "Connected via Tailscale SSH"
 
             docker pull rabin089/heritedge-backend:latest
