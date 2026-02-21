@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout code
@@ -26,30 +27,39 @@ jobs:
           docker build -t rabin089/heritedge-backend:latest .
           docker push rabin089/heritedge-backend:latest
 
-      # 4️⃣ Connect GitHub runner to Tailscale (with tag for ACL permission)\
+      # 4️⃣ Connect GitHub runner to Tailscale
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
+        uses: tailscale/github-action@v2
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_CLIENT_SECRET }}
-          tags: tag:ci-runner                  # Enforces the tag on the CI node
-          hostname: github-ci-${{ github.run_id }}  # Optional, for easy spotting in console
-          # ping: rabindulal                   # Optional: action can auto-ping to wait for connectivity
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
 
-# Verification step (improved)
+      # 5️⃣ Verify Tailscale network
       - name: Verify Tailscale connection
         run: |
-          tailscale status --json | jq .         # Shows full details including tags
-          tailscale ping rabindulal
-          echo "If ping works via DERP/direct, SSH policy is the blocker"
+          tailscale status
+          ping -c 3 100.85.126.66
 
-# Deploy step (add -T for non-interactive)
+      # 6️⃣ Deploy on server via Tailscale SSH
       - name: Deploy on server
-        env:
-          FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
         run: |
-          tailscale ssh -T ${{ secrets.SERVER_USER }}@rabindulal << 'EOF'
-            set -euo pipefail
-            echo "Deploying from CI node: $(tailscale status --json | jq -r '.Self.HostName')"
-            # ... your docker pull/stop/rm/run/prune commands unchanged ...
+          tailscale ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+            set -e
+
+            echo "Connected via Tailscale SSH"
+            docker pull rabin089/heritedge-backend:latest
+
+            docker stop heritedge-backend || true
+            docker rm heritedge-backend || true
+
+            docker run -d \
+              --name heritedge-backend \
+              --restart unless-stopped \
+              --network heritedge-db_default \
+              --env-file /opt/heritedge/heritedge-api/.env \
+              -p 8000:8000 \
+              rabin089/heritedge-backend:latest
+
+            docker image prune -f
+
+            echo "Deployment complete."
           EOF
