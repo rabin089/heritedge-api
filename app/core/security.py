@@ -17,6 +17,8 @@ REFRESH_TOKEN_EXPIRE_MINUTES= int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES"))
 # Initialize Firebase Admin SDK
 cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
 if cred_path:
+    # Normalize path: replace Windows backslashes with forward slashes for Linux compatibility
+    cred_path = cred_path.replace("\\", "/")
     cred = credentials.Certificate(cred_path)
     firebase_admin.initialize_app(cred)
 
