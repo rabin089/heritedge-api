@@ -37,12 +37,12 @@ jobs:
       - name: Verify Tailscale
         run: |
           tailscale status
-          ping -c 3 100.85.126.66
+          ping -c 3 ${{ secrets.SERVER_IP }}
 
       # 6️⃣ Deploy via Tailscale SSH (NO appleboy, NO open SSH)
       - name: Deploy on server
         run: |
-          tailscale ssh ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          tailscale ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             set -e
 
             echo "Connected via Tailscale SSH"
