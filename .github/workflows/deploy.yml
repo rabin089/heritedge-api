@@ -8,7 +8,6 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout code
@@ -27,32 +26,38 @@ jobs:
           docker build -t rabin089/heritedge-backend:latest .
           docker push rabin089/heritedge-backend:latest
 
-      # 4️⃣ Connect GitHub runner to Tailscale
+      # 4️⃣ Connect GitHub runner to Tailscale (with tag for ACL permission)
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
           authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          tags: tag:ci-runner                  # ← Required: assigns tag so ACL allows SSH
+          hostname: github-ci-${{ github.run_id }}  # Optional: unique name per run for easy identification
 
       # 5️⃣ Verify Tailscale network
       - name: Verify Tailscale connection
         run: |
           tailscale status
-          ping -c 3 100.85.126.66
+          tailscale ping rabindulal          # or tag:deploy or 100.85.126.66 if preferred
+          echo "Tailscale ping RTT (should be low):"
+          ping -c 3 100.85.126.66 || true    # fallback if ping fails for any reason
 
       # 6️⃣ Deploy on server via Tailscale SSH
       - name: Deploy on server
         env:
           FIREBASE_CREDENTIALS_JSON: ${{ secrets.FIREBASE_CREDENTIALS_JSON }}
         run: |
-          tailscale ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-            set -e
-
-            echo "Connected via Tailscale SSH"
+          tailscale ssh -T ${{ secrets.SERVER_USER }}@rabindulal << 'EOF'
+            set -euo pipefail
+            echo "Connected via Tailscale SSH to $(hostname)"
+            echo "Pulling latest image..."
             docker pull rabin089/heritedge-backend:latest
 
+            echo "Stopping and removing old container (if exists)..."
             docker stop heritedge-backend || true
             docker rm heritedge-backend || true
 
+            echo "Starting new container..."
             docker run -d \
               --name heritedge-backend \
               --restart unless-stopped \
@@ -63,6 +68,5 @@ jobs:
               rabin089/heritedge-backend:latest
 
             docker image prune -f
-
-            echo "Deployment complete."
+            echo "Deployment complete on $(hostname)."
           EOF
