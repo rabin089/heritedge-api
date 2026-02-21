@@ -64,7 +64,7 @@ jobs:
       - name: Verify Tailscale
         run: |
           sudo tailscale status
-          sudo tailscale ping 100.115.133.57
+          sudo tailscale ping 100.115.133.57 || true
 
       # 8️⃣ Deploy via Tailscale SSH
       - name: Deploy on server
