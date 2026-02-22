@@ -46,7 +46,8 @@ try:
         ]
     }
     
-    client.set_bucket_policy(MINIO_BUCKET, policy)
+    import json
+    client.set_bucket_policy(MINIO_BUCKET, json.dumps(policy))
     print(f"✅ Bucket '{MINIO_BUCKET}' is now public!")
     
     # Verify policy

@@ -49,7 +49,7 @@ class Festival(Base):
 
     # Relationships
     user = relationship("User")
-    heritage_sites = relationship("HeritageSite", secondary="festival_heritage_sites", back_populates="festivals")
+    heritage_sites = relationship("HeritageSite", secondary="festival_heritage_sites", back_populates="festivals", overlaps="festival,heritage_site,heritage_site_associations,festival_associations")
     contributions = relationship("Contribution", back_populates="festival")
     
     
@@ -68,5 +68,5 @@ class FestivalHeritageSite(Base):
     created_by = Column(String, nullable=False)
     
     # Relationships
-    festival = relationship("Festival", backref="heritage_site_associations")
-    heritage_site = relationship("HeritageSite", backref="festival_associations")
+    festival = relationship("Festival", backref="heritage_site_associations", overlaps="heritage_sites")
+    heritage_site = relationship("HeritageSite", backref="festival_associations", overlaps="heritage_sites,festivals")

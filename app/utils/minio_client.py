@@ -21,6 +21,8 @@ client = Minio(
     secure=MINIO_USE_SSL,
 )
 
+import json
+
 def ensure_bucket_public():
     """Ensure the bucket has public read policy"""
     try:
@@ -40,7 +42,8 @@ def ensure_bucket_public():
                 }
             ]
         }
-        client.set_bucket_policy(MINIO_BUCKET, policy)
+        # Minio set_bucket_policy expects a JSON string, not a dict
+        client.set_bucket_policy(MINIO_BUCKET, json.dumps(policy))
         print(f"✅ Bucket '{MINIO_BUCKET}' set to public read")
     except Exception as e:
         print(f"Warning: Could not set bucket policy: {e}")
@@ -59,5 +62,10 @@ def upload_file(file_obj: bytes, object_name: str, content_type: str = "applicat
         content_type=content_type,
     )
     
-    public_url = urljoin(MINIO_PUBLIC_BASE_URL, object_name)
+    # Ensure the base URL ends with a slash for urljoin to work correctly
+    base_url = MINIO_PUBLIC_BASE_URL
+    if not base_url.endswith('/'):
+        base_url += '/'
+        
+    public_url = urljoin(base_url, object_name)
     return public_url
