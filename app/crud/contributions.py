@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
-from sqlalchemy.orm import Session
-from app.models.contribution import Contribution, ContributionStatus
+from app.models.contribution import Contribution, ContributionStatus, ContributionType
 from app.models.heritage_site import HeritageSite
+from app.models.festival import Festival, FestivalStatus
 from uuid import UUID
 from app.schemas.contribution import ContributionCreate, ContributionUpdate
 from app.schemas.heritage_site import HeritageSiteCreate
@@ -134,50 +134,91 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
     if not row or row.status != ContributionStatus.pending:
         return None
 
-    # create heritage site from contribution
-    site_data = HeritageSiteCreate(
-        name=row.name,
-        description=row.description,
-        category=row.category,
-        region=row.region,
-        location=row.location,
-        latitude=row.latitude,
-        longitude=row.longitude,
-        image_url=row.image_url,
-        secondary_images=row.secondary_images,
-        tags=row.tags,
-    )
-    site = HeritageSite(
-        **site_data.model_dump(),
-        created_by=row.created_by,      # original contributor
-        contribution_id=row.id,
-        is_pending=False,
-    )
-    db.add(site)
-    # update contribution status
+    approved_item = None
+    heritage_site_id = None
+    festival_id = None
+
+    if row.type == ContributionType.festival:
+        # Check if dates are provided, fallback to now if missing (though they should be provided)
+        st = row.start_date or datetime.now(timezone.utc)
+        en = row.end_date or datetime.now(timezone.utc)
+        
+        # Create festival
+        approved_item = Festival(
+            name=row.name,
+            description=row.description,
+            start_date=st,
+            end_date=en,
+            region=row.region,
+            status=FestivalStatus.approved,
+            created_by=UUID(admin_user_id) if isinstance(admin_user_id, str) and len(admin_user_id) == 36 else None, # Needs to be UUID
+            # Add other fields if mapping exists
+        )
+        # Handle created_by more carefully since it's a UUID FK in Festival
+        try:
+            if isinstance(admin_user_id, str):
+                approved_item.created_by = UUID(admin_user_id)
+            else:
+                approved_item.created_by = admin_user_id
+        except ValueError:
+            # Fallback to a system user or handle error
+            pass
+            
+        db.add(approved_item)
+        db.flush() # Get the ID
+        festival_id = approved_item.id
+    else:
+        # Create heritage site
+        site_data = HeritageSiteCreate(
+            name=row.name,
+            description=row.description,
+            category=row.category,
+            region=row.region,
+            location=row.location,
+            latitude=row.latitude,
+            longitude=row.longitude,
+            image_url=row.image_url,
+            secondary_images=row.secondary_images,
+            tags=row.tags,
+        )
+        approved_item = HeritageSite(
+            **site_data.model_dump(),
+            created_by=row.created_by,      # original contributor
+            contribution_id=row.id,
+            is_pending=False,
+        )
+        # Audit on site
+        approved_item.approved_by = str(admin_user_id)
+        approved_item.approved_at = datetime.now(timezone.utc)
+        db.add(approved_item)
+        db.flush()
+        heritage_site_id = approved_item.id
+
+    # Update contribution status
     row.status = ContributionStatus.approved
     row.rejection_reason = None
     row.status_reason = comment
     row.approved_by = str(admin_user_id)
     row.approved_at = datetime.now(timezone.utc)
-    # audit on site: who approved (admin)
-    site.approved_by = str(admin_user_id)
-    site.approved_at = datetime.now(timezone.utc)
-    # in-app notification for contributor (admin note in message)
+
+    # In-app notification for contributor
     try:
         notif_crud.create_notification(
             db,
             recipient_email=row.created_by,
             type="contribution_approved",
             title=f"Contribution #{row.id} approved",
-            message=comment or "Approved",
+            message=comment or f"Your {row.type} contribution has been approved!",
         )
     except Exception:
         pass
+
     db.commit()
     db.refresh(row)
-    db.refresh(site)
-    return row, site
+    if approved_item:
+        db.refresh(approved_item)
+    
+    return row, heritage_site_id, festival_id
 
 
 def reject_contribution(db: Session, contrib_id: UUID, reason: str, admin_user_id: str):

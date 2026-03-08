@@ -13,11 +13,17 @@ class ContributionStatus(str, enum.Enum):
     rejected = "rejected"
 
 
+class ContributionType(str, enum.Enum):
+    site = "site"
+    festival = "festival"
+
+
 class Contribution(Base):
     __tablename__ = "contributions"
-
+    
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     # submitted content (same fields as heritage site)
+    type = Column(Enum(ContributionType), default=ContributionType.site, nullable=False)
     name = Column(String, nullable=False)
     description = Column(Text)
     category = Column(String)
@@ -28,6 +34,10 @@ class Contribution(Base):
     image_url = Column(String)
     secondary_images = Column(ARRAY(String, dimensions=1), nullable=True)
     tags = Column(ARRAY(String, dimensions=1), nullable=True)
+    
+    # For Festival type specifically
+    start_date = Column(DateTime(timezone=True), nullable=True)
+    end_date = Column(DateTime(timezone=True), nullable=True)
 
     status = Column(Enum(ContributionStatus), default=ContributionStatus.pending, nullable=False)
     # unified status reason to record approval comment or rejection reason
