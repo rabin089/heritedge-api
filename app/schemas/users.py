@@ -38,6 +38,22 @@ class UserOut(BaseModel):
 class RoleUpdate(BaseModel):
     role: Literal["user", "admin", "superadmin", "reviewer"]
 
+class UserUpdateAdmin(BaseModel):
+    email: Optional[EmailStr] = None
+    name: Optional[str] = None
+    display_name: Optional[str] = None
+    profile_photo_url: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_admin: Optional[bool] = None
+    role: Optional[Literal["user", "admin", "superadmin", "reviewer"]] = None
+    password: Optional[str] = None
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    display_name: Optional[str] = None
+    profile_photo_url: Optional[str] = None
+    password: Optional[str] = None
+
 
 class Token(BaseModel):
     access_token: str

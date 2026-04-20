@@ -20,6 +20,9 @@ class ContributionBase(BaseModel):
     festival_id: Optional[UUID] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
+    significance: Optional[str] = None
+    nepali_date: Optional[str] = None
+    is_annual: bool = False
 
 
 class ContributionCreate(ContributionBase):

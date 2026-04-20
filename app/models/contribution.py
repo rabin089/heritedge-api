@@ -38,6 +38,9 @@ class Contribution(Base):
     # For Festival type specifically
     start_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
+    significance = Column(Text, nullable=True)
+    nepali_date = Column(String, nullable=True)
+    is_annual = Column(Boolean, default=False)
 
     status = Column(Enum(ContributionStatus), default=ContributionStatus.pending, nullable=False)
     # unified status reason to record approval comment or rejection reason

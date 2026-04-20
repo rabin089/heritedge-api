@@ -22,14 +22,19 @@ class FestivalCRUD:
         region: Optional[str] = None,
         category: Optional[FestivalCategory] = None,
         status: Optional[FestivalStatus] = None,
+        created_by: Optional[str] = None,
         tag: Optional[str] = None,
         q: Optional[str] = None,
         is_approved: Optional[bool] = None, # Legacy support or mapping
+        include_unapproved: bool = False
     ) -> tuple[List[Festival], int]:
         """Get multiple festivals with filters and pagination"""
         query = db.query(Festival)
         
         # Apply filters
+        if created_by:
+            query = query.filter(Festival.created_by == UUID(created_by))
+
         if region:
             query = query.filter(Festival.region.ilike(f"%{region}%"))
         
@@ -38,29 +43,25 @@ class FestivalCRUD:
         
         if status:
             query = query.filter(Festival.status == status)
+        elif is_approved is not None:
+            if is_approved:
+                query = query.filter(Festival.status == FestivalStatus.approved)
+            else:
+                query = query.filter(Festival.status != FestivalStatus.approved)
+        elif not include_unapproved:
+            # Default to approved only for public listings
+            query = query.filter(Festival.status == FestivalStatus.approved)
         
         if tag:
             # Assumes tags is ARRAY(String)
             query = query.filter(func.array_to_string(Festival.tags, ',').ilike(f"%{tag}%"))
         
-        # Map is_approved to status for backward compatibility if needed, 
-        # or just rely on status param. 
-        # If both present, status takes precedence or we intersect?
-        # Let's assume user might pass is_approved=True for "Approved"
-        if status is None and is_approved is not None:
-            if is_approved:
-                query = query.filter(Festival.status == FestivalStatus.approved)
-            else:
-                query = query.filter(Festival.status != FestivalStatus.approved)
-        
         if q:
             # Fuzzy search across multiple fields
-            # internal JSON casting for search might be heavy, skipping locations search for now or just name/desc
             search_filter = or_(
                 Festival.name.ilike(f"%{q}%"),
                 Festival.description.ilike(f"%{q}%"),
                 Festival.significance.ilike(f"%{q}%"),
-                # Festival.region.ilike(f"%{q}%"), # Include region in global search?
             )
             query = query.filter(search_filter)
         
@@ -72,7 +73,7 @@ class FestivalCRUD:
         
         return festivals, total
 
-    def create(self, db: Session, obj_in: FestivalCreate, created_by: str) -> Festival:
+    def create(self, db: Session, obj_in: FestivalCreate, created_by: str, status: FestivalStatus = FestivalStatus.pending) -> Festival:
         """Create a new festival"""
         # Convert created_by str to UUID if needed, DB expects UUID
         # obj_in locations is List[LatLng], Pydantic handles it, DB expects JSONB compatible list of dicts.
@@ -81,7 +82,7 @@ class FestivalCRUD:
         db_obj = Festival(
             **obj_in.model_dump(),
             created_by=UUID(created_by),
-            status=FestivalStatus.pending
+            status=status
         )
         db.add(db_obj)
         db.commit()
@@ -121,9 +122,7 @@ class FestivalCRUD:
         festival = self.get(db, festival_id)
         if festival:
             festival.status = FestivalStatus.approved
-            # approved_by/at fields removed from user schema request.
-            # If I want to track it, I can't.
-            # Just set status.
+            festival.moderation_note = approval_reason
             db.commit()
             db.refresh(festival)
         return festival
@@ -139,10 +138,7 @@ class FestivalCRUD:
         festival = self.get(db, festival_id)
         if festival:
             festival.status = FestivalStatus.rejected
-            # Store rejection reason? No field in user schema.
-            # User schema: status: Enum (pending, approved, rejected). No reason field.
-            # I can't store reason unless I deviate.
-            # I'll stick to schema.
+            festival.moderation_note = rejection_reason
             db.commit()
             db.refresh(festival)
         return festival

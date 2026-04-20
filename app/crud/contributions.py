@@ -147,12 +147,19 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
         approved_item = Festival(
             name=row.name,
             description=row.description,
+            significance=row.significance,
             start_date=st,
             end_date=en,
+            nepali_date=row.nepali_date,
             region=row.region,
+            location=row.location,
+            locations=[{"lat": row.latitude, "lng": row.longitude}] if row.latitude is not None and row.longitude is not None else None,
+            category=row.category,
+            tags=row.tags,
+            main_image=row.image_url,
+            gallery=row.secondary_images,
+            is_annual=row.is_annual,
             status=FestivalStatus.approved,
-            created_by=UUID(admin_user_id) if isinstance(admin_user_id, str) and len(admin_user_id) == 36 else None, # Needs to be UUID
-            # Add other fields if mapping exists
         )
         # Handle created_by more carefully since it's a UUID FK in Festival
         try:
@@ -160,8 +167,8 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
                 approved_item.created_by = UUID(admin_user_id)
             else:
                 approved_item.created_by = admin_user_id
-        except ValueError:
-            # Fallback to a system user or handle error
+        except (ValueError, TypeError):
+            # Fallback to current admin user or handle error
             pass
             
         db.add(approved_item)

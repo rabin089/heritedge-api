@@ -12,6 +12,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=True)  # From Google/other auth providers
     profile_photo_url = Column(String, nullable=True)
+    display_name = Column(String, nullable=True)  # Added as real column
     auth_provider = Column(String, default="email", nullable=False)  # email, google, firebase, etc.
     hashed_password = Column(String, nullable=True)
     firebase_uid = Column(String, unique=True, index=True, nullable=True)
@@ -20,8 +21,3 @@ class User(Base):
     role = Column(String, default="user", nullable=False)
     account_created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
-    
-    @property
-    def display_name(self):
-        """For admin/superadmin identity display"""
-        return self.name if self.name else self.email

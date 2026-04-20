@@ -8,9 +8,9 @@ import uuid
 
 
 class FestivalCategory(str, enum.Enum):
-    religious = "Religious"
-    cultural = "Cultural"
-    national = "National"
+    religious = "religious"
+    cultural = "cultural"
+    national = "national"
 
 
 class FestivalStatus(str, enum.Enum):
@@ -46,6 +46,7 @@ class Festival(Base):
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     status = Column(Enum(FestivalStatus), default=FestivalStatus.pending)
+    moderation_note = Column(String, nullable=True)
 
     # Relationships
     user = relationship("User")
