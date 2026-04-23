@@ -4,7 +4,7 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.core.database import SessionLocal
-from app.schemas.users import UserCreate, UserOut, Token, FirebaseLoginRequest, AccountLinkingRequest
+from app.schemas.users import UserCreate, UserOut, Token, FirebaseLoginRequest, AccountLinkingRequest, UserUpdate
 from app.models.user import User
 from app.core.security import hash_password, verify_password, create_access_token, SECRET_KEY, ALGORITHM, \
     create_refresh_token, verify_firebase_token
@@ -42,6 +42,30 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 @router.get("/me", response_model=UserOut)
 def read_user(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.put("/me", response_model=UserOut)
+def update_profile(
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Allow current user to update their own profile details."""
+    if payload.name is not None:
+        current_user.name = payload.name
+        
+    if payload.display_name is not None:
+        current_user.display_name = payload.display_name
+        
+    if payload.profile_photo_url is not None:
+        current_user.profile_photo_url = payload.profile_photo_url
+        
+    if payload.password is not None and payload.password != "":
+        current_user.hashed_password = hash_password(payload.password)
+        
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

@@ -79,6 +79,7 @@ class FestivalOut(FestivalBase):
     
     id: UUID4
     status: FestivalStatus
+    moderation_note: Optional[str] = None
     
     created_at: datetime
     created_by: UUID4

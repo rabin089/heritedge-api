@@ -8,7 +8,7 @@ from app.core.database import SessionLocal
 from app.api.v1.auth import get_current_user
 from app.models.user import User
 from app.core.security import hash_password
-from app.schemas.users import UserOut, AdminCreate, RoleUpdate
+from app.schemas.users import UserOut, AdminCreate, UserUpdateAdmin
 from ._role import is_superadmin, is_admin, is_reviewer
 from app.schemas.contribution import ContributionOut
 from app.models.contribution import ContributionStatus
@@ -69,11 +69,11 @@ def create_user(
     return user
 
 
-# SUPERADMIN: update a user's role
-@router.put("/users/{user_id}/role", response_model=UserOut)
-def update_role(
-    user_id: str,  # Changed from int to str to accept UUID
-    payload: RoleUpdate,
+# SUPERADMIN: update a user's details
+@router.put("/users/{user_id}", response_model=UserOut)
+def update_user_details(
+    user_id: str,
+    payload: UserUpdateAdmin,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -90,11 +90,40 @@ def update_role(
     user = db.query(User).filter(User.id == user_uuid).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user.role = payload.role
-    user.is_admin = payload.role in {"admin", "superadmin"}
+    
+    if payload.email is not None:
+        if db.query(User).filter(User.email == payload.email, User.id != user_uuid).first():
+            raise HTTPException(status_code=400, detail="Email already exists")
+        user.email = payload.email
+        
+    if payload.name is not None:
+        user.name = payload.name
+        
+    if payload.display_name is not None:
+        user.display_name = payload.display_name
+        
+    if payload.profile_photo_url is not None:
+        user.profile_photo_url = payload.profile_photo_url
+        
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+        
+    if payload.is_admin is not None:
+        user.is_admin = payload.is_admin
+        
+    if payload.role is not None:
+        user.role = payload.role
+        # Only auto-sync is_admin based on role if it wasn't explicitly provided
+        if payload.is_admin is None:
+            user.is_admin = payload.role in {"admin", "superadmin"}
+
+    if payload.password is not None and payload.password != "":
+        user.hashed_password = hash_password(payload.password)
+        
     db.commit()
     db.refresh(user)
     return user
+
 
 
 # SUPERADMIN: delete user

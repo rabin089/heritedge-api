@@ -107,8 +107,12 @@ def create_festival(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new festival (requires authentication)"""
-    # Use User ID, not email, as created_by is now UUID FK
-    festival = festival_crud.create(db, festival_in, str(current_user.id))
+    # Auto-approve if created by admin/superadmin
+    status = FestivalStatus.pending
+    if is_admin(current_user):
+        status = FestivalStatus.approved
+        
+    festival = festival_crud.create(db, festival_in, str(current_user.id), status=status)
     return festival
 
 
@@ -123,41 +127,18 @@ def list_my_festivals(
     """List festivals created by the current user"""
     skip = (page - 1) * page_size
     
-    # Pass include_unapproved=True effectively by not filtering on status or allowing any
-    # Logic in list_my_festivals was to get all and filter in python.
-    # Better to filter in DB.
-    # created_by check is strict.
-    
-    # We can't filter by created_by in CRUD get_multi easily without modifying it or filtering in python.
-    # For now, let's filter in python as before, but we need to fetch enough.
-    # Actually, previous code: fetched with include_unapproved=True, then filtered.
-    # With new CRUD, if we don't pass status, it returns all?
-    # CRUD get_multi: if status is None and is_approved is None, it returns everything (pending/approved/rejected)?
-    # Wait, existing CRUD logic:
-    # if is_approved is not None: filter
-    # elif not include_unapproved: filter by approved
-    # So default is APPROVED ONLY.
-    
-    # We need to pass include_unapproved=True or manage status manually.
-    
-    # Let's fetch all statuses
     festivals, total = festival_crud.get_multi(
         db=db,
-        skip=0, # Fetch all then filter? Or pagination breaks.
-        limit=1000, # Temporary hack as current crud doesn't support owner filter
+        skip=skip,
+        limit=page_size,
+        status=status,
+        created_by=str(current_user.id),
         include_unapproved=True
     )
     
-    user_festivals = [f for f in festivals if str(f.created_by) == str(current_user.id)]
-    
-    # Pagination
-    start = (page - 1) * page_size
-    end = start + page_size
-    paginated_items = user_festivals[start:end]
-    
     return FestivalListResponse(
-        items=paginated_items,
-        total=len(user_festivals),
+        items=festivals,
+        total=total,
         page=page,
         page_size=page_size
     )
@@ -250,25 +231,35 @@ def approve_festival(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Approve or reject a festival"""
+    """Approve or reject a festival (Admin only)"""
     if not is_admin(current_user):
-        raise HTTPException(status_code=403, detail="Admin only")
-    # Adapted for new schema which uses status enum
-    # We use approval.status to determine action
+        raise HTTPException(status_code=403, detail="Admin or Super Admin only")
     
-    if approval.status == FestivalStatus.approved:
-        festival = festival_crud.approve(db, festival_id, str(current_user.id))
+    # We use status primarily now, but keep is_approved for legacy
+    status = approval.status
+    if not status:
+        status = FestivalStatus.approved if approval.is_approved else FestivalStatus.rejected
+        
+    if status == FestivalStatus.approved:
+        festival = festival_crud.approve(db, festival_id, str(current_user.id), approval.rejection_reason)
         if festival:
-            return {"message": "Festival approved successfully", "festival_id": str(festival_id)}
-    elif approval.status == FestivalStatus.rejected:
-        festival = festival_crud.reject(db, festival_id, str(current_user.id), approval.rejection_reason or "Rejected")
+            return {"message": "Festival approved successfully", "festival_id": str(festival_id), "status": "approved"}
+    elif status == FestivalStatus.rejected:
+        # Rejection reason is mandatory for rejection
+        reason = approval.rejection_reason or "Rejected by moderator"
+        festival = festival_crud.reject(db, festival_id, str(current_user.id), reason)
         if festival:
-            return {"message": "Festival rejected successfully", "festival_id": str(festival_id)}
-    else:
-         # Handle pending or invalid?
-         pass
+            return {"message": "Festival rejected successfully", "festival_id": str(festival_id), "status": "rejected"}
+    elif status == FestivalStatus.pending:
+         # Optionally set back to pending
+         festival = festival_crud.get(db, festival_id)
+         if festival:
+             festival.status = FestivalStatus.pending
+             festival.moderation_note = approval.rejection_reason
+             db.commit()
+             return {"message": "Festival set to pending", "festival_id": str(festival_id)}
             
-    raise HTTPException(status_code=404, detail="Festival not found or invalid status")
+    raise HTTPException(status_code=404, detail="Festival not found or invalid status provided")
 
 
 # Festival-Heritage Site relationship endpoints

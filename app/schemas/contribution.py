@@ -1,11 +1,12 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from app.models.contribution import ContributionStatus
+from app.models.contribution import ContributionStatus, ContributionType
 from uuid import UUID
 
 
 class ContributionBase(BaseModel):
+    type: ContributionType = ContributionType.site
     name: str
     description: Optional[str] = None
     category: Optional[str] = None
@@ -17,6 +18,11 @@ class ContributionBase(BaseModel):
     secondary_images: Optional[List[str]] = None
     tags: Optional[List[str]] = None
     festival_id: Optional[UUID] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    significance: Optional[str] = None
+    nepali_date: Optional[str] = None
+    is_annual: bool = False
 
 
 class ContributionCreate(ContributionBase):
@@ -55,4 +61,5 @@ class RejectContributionIn(BaseModel):
 class ApproveContributionOut(BaseModel):
     message: str
     contribution_id: UUID
-    heritage_site_id: UUID
+    heritage_site_id: Optional[UUID] = None
+    festival_id: Optional[UUID] = None

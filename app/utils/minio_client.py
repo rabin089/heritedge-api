@@ -49,10 +49,8 @@ def ensure_bucket_public():
         print(f"Warning: Could not set bucket policy: {e}")
 
 def upload_file(file_obj: bytes, object_name: str, content_type: str = "application/octet-stream"):
-    # Ensure bucket is public (run this once, or call it manually)
     ensure_bucket_public()
-    
-    # Convert bytes to file-like object
+
     file_data = BytesIO(file_obj)
     client.put_object(
         bucket_name=MINIO_BUCKET,
@@ -61,11 +59,7 @@ def upload_file(file_obj: bytes, object_name: str, content_type: str = "applicat
         length=len(file_obj),
         content_type=content_type,
     )
-    
-    # Ensure the base URL ends with a slash for urljoin to work correctly
-    base_url = MINIO_PUBLIC_BASE_URL
-    if not base_url.endswith('/'):
-        base_url += '/'
-        
-    public_url = urljoin(base_url, object_name)
-    return public_url
+
+    base_url = (MINIO_PUBLIC_BASE_URL or "").rstrip("/")
+    return f"{base_url}/{object_name}"
+

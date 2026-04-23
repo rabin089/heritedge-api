@@ -1,16 +1,16 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Float, Text, Boolean, DateTime, ForeignKey, Enum
 from sqlalchemy.dialects.postgresql import ARRAY, UUID, JSONB
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from app.core.database import Base
 import enum
 import uuid
 
 
 class FestivalCategory(str, enum.Enum):
-    religious = "Religious"
-    cultural = "Cultural"
-    national = "National"
+    religious = "religious"
+    cultural = "cultural"
+    national = "national"
 
 
 class FestivalStatus(str, enum.Enum):
@@ -46,13 +46,14 @@ class Festival(Base):
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     
     status = Column(Enum(FestivalStatus), default=FestivalStatus.pending)
+    moderation_note = Column(String, nullable=True)
 
     # Relationships
     user = relationship("User")
     heritage_sites = relationship("HeritageSite", secondary="festival_heritage_sites", back_populates="festivals", overlaps="festival,heritage_site,heritage_site_associations,festival_associations")
     contributions = relationship("Contribution", back_populates="festival")
-    
-    
+
+
 class FestivalHeritageSite(Base):
     __tablename__ = "festival_heritage_sites"
     
@@ -68,5 +69,13 @@ class FestivalHeritageSite(Base):
     created_by = Column(String, nullable=False)
     
     # Relationships
-    festival = relationship("Festival", backref="heritage_site_associations", overlaps="heritage_sites")
-    heritage_site = relationship("HeritageSite", backref="festival_associations", overlaps="heritage_sites,festivals")
+    festival = relationship(
+        "Festival",
+        backref=backref("heritage_site_associations", overlaps="festivals,heritage_sites"),
+        overlaps="heritage_sites,festivals",
+    )
+    heritage_site = relationship(
+        "HeritageSite",
+        backref=backref("festival_associations", overlaps="festivals,heritage_sites"),
+        overlaps="heritage_sites,festivals",
+    )
