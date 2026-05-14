@@ -67,3 +67,11 @@ class Contribution(Base):
     # backref from HeritageSite if approved (optional relationship)
     heritage_site = relationship("HeritageSite", uselist=False, back_populates="contribution")
     festival = relationship("Festival", back_populates="contributions")
+
+    # Relationship to user via email (created_by column)
+    creator_details = relationship(
+        "User",
+        primaryjoin="foreign(Contribution.created_by) == User.email",
+        viewonly=True,
+        uselist=False
+    )

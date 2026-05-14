@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.models.contribution import Contribution, ContributionStatus, ContributionType
 from app.models.heritage_site import HeritageSite
 from app.models.festival import Festival, FestivalStatus
@@ -33,7 +33,7 @@ def list_my_contributions(db: Session, user_id: str, status: ContributionStatus 
 
 
 def list_all_contributions(db: Session, status: ContributionStatus | None = None):
-    q = db.query(Contribution).filter(Contribution.is_deleted == False)
+    q = db.query(Contribution).options(joinedload(Contribution.creator_details)).filter(Contribution.is_deleted == False)
     if status:
         q = q.filter(Contribution.status == status)
     return q.order_by(Contribution.created_at.desc()).all()
@@ -47,7 +47,7 @@ def admin_list_pending_contributions(
     page: int,
     page_size: int,
 ):
-    base = db.query(Contribution).filter(
+    base = db.query(Contribution).options(joinedload(Contribution.creator_details)).filter(
         Contribution.is_deleted == False,
         Contribution.status == ContributionStatus.pending,
     )
@@ -228,7 +228,7 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
     return row, heritage_site_id, festival_id
 
 
-def reject_contribution(db: Session, contrib_id: UUID, reason: str, admin_user_id: str):
+def reject_contribution(db: Session, contrib_id: UUID, reason: str | None, admin_user_id: str):
     row = db.query(Contribution).filter(Contribution.id == contrib_id).first()
     if not row or row.status != ContributionStatus.pending:
         return None

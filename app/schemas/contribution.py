@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 from app.models.contribution import ContributionStatus, ContributionType
 from uuid import UUID
+from .users import UserMinimal
 
 
 class ContributionBase(BaseModel):
@@ -44,6 +45,7 @@ class ContributionOut(ContributionBase):
     rejection_reason: Optional[str] = None
     created_at: datetime
     created_by: str
+    creator_details: Optional[UserMinimal] = None
 
     # if approved, there may be a related site id
     class Config:
@@ -55,7 +57,7 @@ class ApproveContributionIn(BaseModel):
 
 
 class RejectContributionIn(BaseModel):
-    reason: str
+    reason: Optional[str] = None
 
 
 class ApproveContributionOut(BaseModel):

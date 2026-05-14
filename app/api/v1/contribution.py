@@ -149,19 +149,20 @@ def approve_contribution(
 @router.post("/{contrib_id}/reject", response_model=ContributionOut)
 def reject_contribution(
     contrib_id: UUID,
-    payload: RejectContributionIn,
+    payload: RejectContributionIn = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
-    if not payload or not payload.reason:
-        raise HTTPException(status_code=422, detail="Rejection reason is required")
+    
+    reason = payload.reason if payload else "No reason provided"
+    
     # support both new and old CRUD signatures (with/without admin_user_id)
     try:
-        row = crud.reject_contribution(db, contrib_id, payload.reason, current_user.id)
+        row = crud.reject_contribution(db, contrib_id, reason, current_user.id)
     except TypeError:
-        row = crud.reject_contribution(db, contrib_id, payload.reason)
+        row = crud.reject_contribution(db, contrib_id, reason)
     if not row:
         raise HTTPException(status_code=400, detail="Contribution not found or not pending")
     return row

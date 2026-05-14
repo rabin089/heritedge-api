@@ -3,6 +3,17 @@ from typing import Literal, Optional
 from uuid import UUID
 from datetime import datetime
 
+class UserMinimal(BaseModel):
+    name: Optional[str] = ""
+    display_name: Optional[str] = ""
+    email: EmailStr
+    profile_photo_url: Optional[str] = None
+    role: str
+
+    class Config:
+        from_attributes = True
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: Optional[str] = None  # Optional for OAuth users
