@@ -1,4 +1,4 @@
-name: CI/CD – Build & Deploy FastAPI via Docker + Tailscale (Auth Key)
+name: Docker Deploy
 
 on:
   push:
@@ -6,92 +6,46 @@ on:
       - dev
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      # 1️⃣ Checkout repository
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # 2️⃣ Login to Docker Hub
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      # 3️⃣ Build & push Docker image
-      - name: Build and push Docker image
+      - name: Build image
         run: |
-          docker build -t rabin089/heritedge-backend:latest .
-          docker push rabin089/heritedge-backend:latest
+          docker build -t ghcr.io/${{ github.repository_owner }}/heritedge-api:latest .
 
-      # 4️⃣ Install Tailscale
-      - name: Install Tailscale
+      - name: Push image
         run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
+          docker push ghcr.io/${{ github.repository_owner }}/heritedge-api:latest
 
-      # 5️⃣ Start tailscaled manually (NO systemd)
-      - name: Start tailscaled
+      - name: Install cloudflared
         run: |
-          sudo mkdir -p /var/lib/tailscale /var/run/tailscale
+          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
 
-          sudo tailscaled \
-            --state=/var/lib/tailscale/tailscaled.state \
-            --socket=/var/run/tailscale/tailscaled.sock \
-            > ~/tailscaled.log 2>&1 &
-
-          # Wait for socket
-          for i in {1..20}; do
-            if [ -S /var/run/tailscale/tailscaled.sock ]; then
-              echo "tailscaled is ready"
-              break
-            fi
-            sleep 0.5
-          done
-
-      # 6️⃣ Bring Tailscale up using AUTH KEY
-      - name: Connect to Tailscale (auth key)
+      - name: Setup SSH
         run: |
-          sudo tailscale up \
-            --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} \
-            --hostname=github-ci-${{ github.run_id }} \
-            --accept-dns=false \
-            --accept-routes=false
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
 
-      # 7️⃣ Verify Tailscale connection
-      - name: Verify Tailscale
-        run: |
-          sudo tailscale status
-          sudo tailscale ping 100.115.133.57 || true
-
-      # 8️⃣ Deploy via Tailscale SSH
-      - name: Deploy on server
-        run: |
-          sudo tailscale ssh "rabin089@100.115.133.57" << 'EOF'
-            set -e
-
-            echo "Connected via Tailscale SSH"
-
-            docker pull rabin089/heritedge-backend:latest
-
-            docker stop heritedge-backend || true
-            docker rm heritedge-backend || true
-
-            docker run -d \
-              --name heritedge-backend \
-              --restart unless-stopped \
-              --network heritedge-db_default \
-              --env-file /opt/heritedge/heritedge-api/.env \
-              -p 8000:8000 \
-              rabin089/heritedge-backend:latest
-
-            docker image prune -f
+          cat > ~/.ssh/config << EOF
+          Host heritedge
+            HostName ssh.rabindulal.com.np
+            User rabin089
+            IdentityFile ~/.ssh/id_ed25519
+            ProxyCommand cloudflared access ssh --hostname %h
+            StrictHostKeyChecking no
           EOF
 
-      # 9️⃣ Cleanup (important)
-      - name: Tailscale cleanup
-        if: always()
-        run: |
-          sudo tailscale down || true
+      - name: Deploy on server
+        run: ssh heritedge "~/deploy.sh"
