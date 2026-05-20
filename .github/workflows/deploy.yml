@@ -52,10 +52,7 @@ jobs:
 
           sudo dpkg -i cloudflared-linux-amd64.deb
 
-      # -----------------------------
-      # Configure SSH
-      #
-      # -----------------------------
+    
       - name: Configure SSH
         run: |
           set -eu
@@ -79,9 +76,7 @@ jobs:
             ServerAliveInterval 60
           EOF
 
-      # -----------------------------
-      # Test SSH connection
-      # -----------------------------
+    
       - name: Test SSH connection
         run: |
           ssh -o StrictHostKeyChecking=yes heritedge "echo SSH connection successful"
