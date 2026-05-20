@@ -16,103 +16,96 @@ jobs:
       contents: read
       packages: write
 
+    env:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
     steps:
-      # -----------------------------------
-      # Checkout repository
-      # -----------------------------------
+      # -----------------------------
+      # Checkout
+      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------------
+      # -----------------------------
       # Login to GHCR
-      # -----------------------------------
+      # -----------------------------
       - name: Login to GitHub Container Registry
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+            -u "${{ github.actor }}" --password-stdin
 
-      # -----------------------------------
-      # Build Docker image
-      # -----------------------------------
+      # -----------------------------
+      # Build image
+      # -----------------------------
       - name: Build Docker image
         run: |
-          docker build \
-            -t $IMAGE_NAME \
-            .
+          set -euo pipefail
+          docker build -t $IMAGE_NAME .
 
-      # -----------------------------------
-      # Push Docker image
-      # -----------------------------------
+      # -----------------------------
+      # Push image
+      # -----------------------------
       - name: Push Docker image
         run: |
+          set -euo pipefail
           docker push $IMAGE_NAME
 
-      # -----------------------------------
-      # Install cloudflared
-      # -----------------------------------
+      # -----------------------------
+      # Install cloudflared (only if you truly need it)
+      # -----------------------------
       - name: Install cloudflared
         run: |
+          set -euo pipefail
           wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-
           sudo dpkg -i cloudflared-linux-amd64.deb
 
-      # -----------------------------------
-      # Configure SSH
-      # -----------------------------------
-      - name: Configure SSH
+      # -----------------------------
+      # Configure SSH (robust version)
+      # -----------------------------
+      - name: Setup SSH
         shell: bash
         run: |
-          set -eu
+          set -euo pipefail
 
           mkdir -p ~/.ssh
 
-          cat << 'EOF' > ~/.ssh/id_ed25519
-          ${{ secrets.SSH_PRIVATE_KEY }}
-          EOF
-
-          # Remove Windows CRLF characters
-          sed -i 's/\r$//' ~/.ssh/id_ed25519
-
+          # Write key safely
+          printf "%s" "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
 
-          # Validate SSH key
+          # Validate key immediately
           ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
 
-          # Add known host
-          ssh-keyscan ssh.rabindulal.com.np >> ~/.ssh/known_hosts
+          # Known hosts
+          ssh-keyscan -H ssh.rabindulal.com.np >> ~/.ssh/known_hosts
 
-          # SSH config
-          cat << 'EOF' > ~/.ssh/config
+          # SSH config (NO proxy unless required)
+          cat > ~/.ssh/config <<EOF
           Host heritedge
             HostName ssh.rabindulal.com.np
             User rabin089
             IdentityFile ~/.ssh/id_ed25519
-            ProxyCommand cloudflared access ssh --hostname %h
+            StrictHostKeyChecking yes
             ServerAliveInterval 60
           EOF
 
-      # -----------------------------------
-      # Debug SSH
-      # -----------------------------------
-      - name: Debug SSH key
-        run: |
-          file ~/.ssh/id_ed25519
-          wc -l ~/.ssh/id_ed25519
-          head -n 1 ~/.ssh/id_ed25519
-
-      # -----------------------------------
+      # -----------------------------
       # Test SSH connection
-      # -----------------------------------
+      # -----------------------------
       - name: Test SSH connection
         run: |
-          ssh -o StrictHostKeyChecking=yes heritedge "echo SSH connection successful"
+          set -euo pipefail
+          ssh heritedge "echo 'SSH OK' && whoami"
 
-      # -----------------------------------
-      # Deploy application
-      # -----------------------------------
+      # -----------------------------
+      # Deploy on server
+      # -----------------------------
       - name: Deploy application
         run: |
+          set -euo pipefail
+
           ssh heritedge << 'EOF'
-            set -e
+            set -euo pipefail
 
             cd ~/infra/heritedge
 
@@ -125,7 +118,7 @@ jobs:
             echo "Cleaning old images..."
             docker image prune -f
 
-            echo "Running containers:"
+            echo "Current running containers:"
             docker ps
 
             echo "Deployment completed successfully"
