@@ -5,6 +5,9 @@ on:
     branches:
       - dev
 
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/heritedge-backend:latest
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,49 +20,92 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      # -----------------------------
+      # Login to GHCR
+      # -----------------------------
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
+      # -----------------------------
+      # Build Docker image
+      # -----------------------------
       - name: Build Docker image
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/heritedge-backend:latest .
+          docker build \
+            -t $IMAGE_NAME \
+            .
 
+      # -----------------------------
+      # Push Docker image
+      # -----------------------------
       - name: Push Docker image
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/heritedge-backend:latest
+          docker push $IMAGE_NAME
 
+      # -----------------------------
+      # Install cloudflared
+      # -----------------------------
       - name: Install cloudflared
         run: |
-          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+
           sudo dpkg -i cloudflared-linux-amd64.deb
 
+      # -----------------------------
+      # Configure SSH
+      # -----------------------------
       - name: Configure SSH
         run: |
+          set -eu
+
           mkdir -p ~/.ssh
 
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          printf "%s" "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+
           chmod 600 ~/.ssh/id_ed25519
+
+          ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null
 
           ssh-keyscan ssh.rabindulal.com.np >> ~/.ssh/known_hosts
 
-          cat > ~/.ssh/config << EOF
+          cat > ~/.ssh/config << 'EOF'
           Host heritedge
             HostName ssh.rabindulal.com.np
             User rabin089
             IdentityFile ~/.ssh/id_ed25519
             ProxyCommand cloudflared access ssh --hostname %h
+            ServerAliveInterval 60
           EOF
 
+      # -----------------------------
+      # Test SSH connection
+      # -----------------------------
       - name: Test SSH connection
         run: |
-          ssh heritedge "echo SSH connection successful"
+          ssh -o StrictHostKeyChecking=yes heritedge "echo SSH connection successful"
 
-      - name: Deploy on server
+      # -----------------------------
+      # Deploy on server
+      # -----------------------------
+      - name: Deploy application
         run: |
-          ssh heritedge "
-            cd ~/infra/heritedge &&
-            docker compose pull &&
-            docker compose up -d --remove-orphans &&
-            docker image prune -f &&
-            docker ps | grep heritedge-backend
-          "
+          ssh heritedge << 'EOF'
+            set -e
+
+            cd ~/infra/heritedge
+
+            echo "Pulling latest images..."
+            docker compose pull
+
+            echo "Restarting containers..."
+            docker compose up -d --remove-orphans
+
+            echo "Cleaning unused images..."
+            docker image prune -f
+
+            echo "Running containers:"
+            docker ps
+
+            echo "Deployment completed successfully"
+          EOF
