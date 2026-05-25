@@ -27,7 +27,8 @@ class ContributionBase(BaseModel):
 
 
 class ContributionCreate(ContributionBase):
-    pass
+    contributor_name: Optional[str] = None
+    contributor_email: Optional[str] = None
 
 
 class ContributionUpdate(ContributionBase):
@@ -45,6 +46,8 @@ class ContributionOut(ContributionBase):
     rejection_reason: Optional[str] = None
     created_at: datetime
     created_by: str
+    contributor_name: Optional[str] = None
+    contributor_email: Optional[str] = None
     creator_details: Optional[UserMinimal] = None
 
     # if approved, there may be a related site id

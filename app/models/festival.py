@@ -52,6 +52,8 @@ class Festival(Base):
     user = relationship("User")
     heritage_sites = relationship("HeritageSite", secondary="festival_heritage_sites", back_populates="festivals", overlaps="festival,heritage_site,heritage_site_associations,festival_associations")
     contributions = relationship("Contribution", back_populates="festival")
+    reactions = relationship("FestivalReaction", back_populates="festival", cascade="all, delete-orphan")
+    stories = relationship("FestivalStory", back_populates="festival", cascade="all, delete-orphan")
 
 
 class FestivalHeritageSite(Base):

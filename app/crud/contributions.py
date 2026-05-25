@@ -19,11 +19,11 @@ def create_contribution(db: Session, data: ContributionCreate, user_id: str):
 
 
 def get_contribution_by_id(db: Session, contrib_id: UUID):
-    return db.query(Contribution).filter(Contribution.id == contrib_id).first()
+    return db.query(Contribution).options(joinedload(Contribution.creator_details)).filter(Contribution.id == contrib_id).first()
 
 
 def list_my_contributions(db: Session, user_id: str, status: ContributionStatus | None = None):
-    q = db.query(Contribution).filter(
+    q = db.query(Contribution).options(joinedload(Contribution.creator_details)).filter(
         Contribution.created_by == user_id,
         Contribution.is_deleted == False,
     )
@@ -83,7 +83,7 @@ def admin_user_contribution_history(
     page_size: int,
     status: ContributionStatus | None = None,
 ):
-    base = db.query(Contribution).filter(
+    base = db.query(Contribution).options(joinedload(Contribution.creator_details)).filter(
         Contribution.is_deleted == False,
         Contribution.created_by == user_email,
     )
@@ -228,7 +228,7 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
     return row, heritage_site_id, festival_id
 
 
-def reject_contribution(db: Session, contrib_id: UUID, reason: str | None, admin_user_id: str):
+def reject_contribution(db: Session, contrib_id: UUID, reason: str, admin_user_id: str):
     row = db.query(Contribution).filter(Contribution.id == contrib_id).first()
     if not row or row.status != ContributionStatus.pending:
         return None
@@ -237,7 +237,6 @@ def reject_contribution(db: Session, contrib_id: UUID, reason: str | None, admin
     row.status_reason = reason
     row.updated_by = str(admin_user_id)
     row.updated_at = datetime.now(timezone.utc)
-    # in-app notification for contributor with admin reason
     try:
         notif_crud.create_notification(
             db,

@@ -52,6 +52,8 @@ class Contribution(Base):
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     created_by = Column(String, nullable=False)  # user id or email (your existing type)
+    contributor_name = Column(String, nullable=True)
+    contributor_email = Column(String, nullable=True)
 
     # soft delete flag
     is_deleted = Column(Boolean, default=False, nullable=False)

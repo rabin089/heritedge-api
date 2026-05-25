@@ -40,6 +40,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 
+def get_current_user_email(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> str:
+    """Return the email of the current authenticated user."""
+    user = get_current_user(token=token, db=db)
+    return user.email
+
+
 @router.get("/me", response_model=UserOut)
 def read_user(current_user: User = Depends(get_current_user)):
     return current_user

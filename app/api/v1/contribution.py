@@ -63,6 +63,12 @@ def create_contribution(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Auto-populate contributor details from the authenticated user if missing
+    if not payload.contributor_name:
+        payload.contributor_name = current_user.display_name or current_user.name
+    if not payload.contributor_email:
+        payload.contributor_email = current_user.email
+
     # Store creator as email (created_by is a String column)
     _validate_images(payload.image_url, payload.secondary_images)
     row = crud.create_contribution(db, payload, user_id=current_user.email)
@@ -149,16 +155,18 @@ def approve_contribution(
 @router.post("/{contrib_id}/reject", response_model=ContributionOut)
 def reject_contribution(
     contrib_id: UUID,
-    payload: RejectContributionIn = Body(default=None),
+    payload: RejectContributionIn = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
-    
-    reason = payload.reason if payload else "No reason provided"
-    
-    # support both new and old CRUD signatures (with/without admin_user_id)
+
+    if not payload.reason:
+        raise HTTPException(status_code=400, detail="Rejection reason is required.")
+
+    reason = payload.reason
+
     try:
         row = crud.reject_contribution(db, contrib_id, reason, current_user.id)
     except TypeError:
