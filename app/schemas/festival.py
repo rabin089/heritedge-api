@@ -83,6 +83,8 @@ class FestivalOut(FestivalBase):
     
     created_at: datetime
     created_by: UUID4
+    contributor_id: UUID4
+    contributor_name: str = "Anonymous"
     
     # Relationships if needed to be embedded, usually handled separately not to bloat
     # but based on previous schema, we keep it simple.

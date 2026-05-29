@@ -45,16 +45,12 @@ def create_site_review(
     current_user: User = Depends(get_current_user)
 ):
     """Add a review to a heritage site (users cannot review their own contributions)"""
-    review_data = SiteReviewCreate(site_id=site_id, **review_data.dict())
-    review = crud.create_site_review(db, review_data, current_user.email)
-    
-    if not review:
-        raise HTTPException(
-            status_code=400, 
-            detail="Cannot create review. You may have already reviewed this site or cannot review your own contribution."
-        )
-    
-    return review
+    review_data = SiteReviewCreate(site_id=site_id, **review_data.dict(exclude={"site_id"}))
+    try:
+        review = crud.create_site_review(db, review_data, current_user.email)
+        return review
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # GET /heritage-sites/{site_id}/reviews - Get all reviews for a site
@@ -118,16 +114,12 @@ def rate_site(
     current_user: User = Depends(get_current_user)
 ):
     """Rate a heritage site (users cannot rate their own contributions)"""
-    rating_data = SiteRatingCreate(site_id=site_id, **rating_data.dict())
-    rating = crud.create_site_rating(db, rating_data, current_user.email)
-    
-    if not rating:
-        raise HTTPException(
-            status_code=400, 
-            detail="Cannot rate this site. You cannot rate your own contribution."
-        )
-    
-    return rating
+    rating_data = SiteRatingCreate(site_id=site_id, **rating_data.dict(exclude={"site_id"}))
+    try:
+        rating = crud.create_site_rating(db, rating_data, current_user.email)
+        return rating
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # GET /heritage-sites/{site_id}/stats - Get site review stats

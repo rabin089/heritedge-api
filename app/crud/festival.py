@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, text, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from app.models.festival import Festival, FestivalHeritageSite, FestivalStatus, FestivalCategory
@@ -12,7 +12,7 @@ import uuid
 class FestivalCRUD:
     def get(self, db: Session, festival_id: UUID) -> Optional[Festival]:
         """Get a festival by ID"""
-        return db.query(Festival).filter(Festival.id == festival_id).first()
+        return db.query(Festival).options(joinedload(Festival.user)).filter(Festival.id == festival_id).first()
 
     def get_multi(
         self,
@@ -29,7 +29,7 @@ class FestivalCRUD:
         include_unapproved: bool = False
     ) -> tuple[List[Festival], int]:
         """Get multiple festivals with filters and pagination"""
-        query = db.query(Festival)
+        query = db.query(Festival).options(joinedload(Festival.user))
         
         # Apply filters
         if created_by:
@@ -154,7 +154,7 @@ class FestivalCRUD:
 
     def get_upcoming_festivals(self, db: Session, limit: int = 10) -> List[Festival]:
         """Get upcoming approved festivals"""
-        return db.query(Festival).filter(
+        return db.query(Festival).options(joinedload(Festival.user)).filter(
             and_(
                 Festival.status == FestivalStatus.approved,
                 Festival.start_date > func.now()
@@ -164,7 +164,7 @@ class FestivalCRUD:
     def get_ongoing_festivals(self, db: Session) -> List[Festival]:
         """Get currently ongoing approved festivals"""
         now = func.now()
-        return db.query(Festival).filter(
+        return db.query(Festival).options(joinedload(Festival.user)).filter(
             and_(
                 Festival.status == FestivalStatus.approved,
                 Festival.start_date <= now,

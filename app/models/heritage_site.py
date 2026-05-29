@@ -40,3 +40,22 @@ class HeritageSite(Base):
     reviews = relationship("SiteReview", back_populates="heritage_site", cascade="all, delete-orphan")
     ratings = relationship("SiteRating", back_populates="heritage_site", cascade="all, delete-orphan")
     festivals = relationship("Festival", secondary="festival_heritage_sites", back_populates="heritage_sites")
+
+    creator_details = relationship(
+        "User",
+        primaryjoin="foreign(HeritageSite.created_by) == User.email",
+        viewonly=True,
+        uselist=False
+    )
+
+    @property
+    def contributor_id(self):
+        if self.creator_details:
+            return self.creator_details.id
+        return None
+
+    @property
+    def contributor_name(self):
+        if self.creator_details:
+            return self.creator_details.display_name or self.creator_details.name or "Anonymous"
+        return "Anonymous"

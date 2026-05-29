@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import any_, func
 from uuid import UUID
 from app.models.heritage_site import HeritageSite
@@ -34,7 +34,7 @@ def get_filtered_sites(
     page_size: int | None = None,
 ):
     # Public should only see approved sites
-    query = db.query(HeritageSite).filter(
+    query = db.query(HeritageSite).options(joinedload(HeritageSite.creator_details)).filter(
         HeritageSite.is_pending == False,
         HeritageSite.is_deleted == False,
     )
@@ -72,6 +72,7 @@ def get_filtered_sites(
 def get_site_by_id(db: Session, site_id: UUID):
     return (
         db.query(HeritageSite)
+        .options(joinedload(HeritageSite.creator_details))
         .filter(HeritageSite.id == site_id, HeritageSite.is_deleted == False)
         .first()
     )

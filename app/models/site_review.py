@@ -19,6 +19,25 @@ class SiteReview(Base):
 
     # Relationships
     heritage_site = relationship("HeritageSite", back_populates="reviews")
+    
+    reviewer = relationship(
+        "User",
+        primaryjoin="foreign(SiteReview.user_email) == User.email",
+        viewonly=True,
+        uselist=False
+    )
+
+    @property
+    def reviewer_name(self):
+        if self.reviewer:
+            return self.reviewer.display_name or self.reviewer.name or "Anonymous User"
+        return "Anonymous User"
+        
+    @property
+    def reviewer_avatar(self):
+        if self.reviewer:
+            return self.reviewer.profile_photo_url
+        return None
 
     # Constraints
     __table_args__ = (

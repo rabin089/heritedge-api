@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, and_, or_
 from uuid import UUID
 from app.models.site_review import SiteReview, SiteRating
@@ -43,7 +43,7 @@ def can_user_review_site(db: Session, site_id: UUID, user_email: str) -> bool:
 def create_site_review(db: Session, review_data: SiteReviewCreate, user_email: str):
     """Create a new site review"""
     if not can_user_review_site(db, review_data.site_id, user_email):
-        return None
+        raise ValueError("You cannot review your own contribution.")
     
     # Check if user already reviewed this site
     existing_review = db.query(SiteReview).filter(
@@ -51,7 +51,7 @@ def create_site_review(db: Session, review_data: SiteReviewCreate, user_email: s
     ).first()
     
     if existing_review:
-        return None  # User already reviewed
+        raise ValueError("You have already reviewed this site. You can only update your existing review.")
     
     review = SiteReview(
         site_id=review_data.site_id,
@@ -101,7 +101,7 @@ def delete_site_review(db: Session, review_id: UUID, user_email: str):
 
 def get_site_reviews(db: Session, site_id: UUID, page: int = 1, page_size: int = 20):
     """Get all reviews for a site with pagination"""
-    query = db.query(SiteReview).filter(SiteReview.site_id == site_id)
+    query = db.query(SiteReview).options(joinedload(SiteReview.reviewer)).filter(SiteReview.site_id == site_id)
     total = query.count()
     
     offset = (page - 1) * page_size
@@ -113,7 +113,7 @@ def get_site_reviews(db: Session, site_id: UUID, page: int = 1, page_size: int =
 def create_site_rating(db: Session, rating_data: SiteRatingCreate, user_email: str):
     """Create or update a site rating"""
     if not can_user_review_site(db, rating_data.site_id, user_email):
-        return None
+        raise ValueError("You cannot rate your own contribution.")
     
     # Check if user already rated this site
     existing_rating = db.query(SiteRating).filter(

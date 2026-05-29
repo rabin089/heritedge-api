@@ -55,6 +55,16 @@ class Festival(Base):
     reactions = relationship("FestivalReaction", back_populates="festival", cascade="all, delete-orphan")
     stories = relationship("FestivalStory", back_populates="festival", cascade="all, delete-orphan")
 
+    @property
+    def contributor_id(self):
+        return self.created_by
+
+    @property
+    def contributor_name(self):
+        if self.user:
+            return self.user.display_name or self.user.name or "Anonymous"
+        return "Anonymous"
+
 
 class FestivalHeritageSite(Base):
     __tablename__ = "festival_heritage_sites"

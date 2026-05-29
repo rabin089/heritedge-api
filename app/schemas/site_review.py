@@ -43,6 +43,8 @@ class SiteReviewOut(BaseModel):
     comment: str
     created_at: datetime
     updated_at: datetime
+    reviewer_name: str = "Anonymous User"
+    reviewer_avatar: Optional[str] = None
 
     class Config:
         from_attributes = True

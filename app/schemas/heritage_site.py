@@ -27,6 +27,8 @@ class HeritageSiteOut(HeritageSiteBase):
     created_at: datetime
     contribution_id: Optional[UUID] = None
     is_pending: bool = False
+    contributor_id: Optional[UUID] = None
+    contributor_name: str = "Anonymous"
 
     class Config:
         from_attributes = True
