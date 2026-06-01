@@ -10,7 +10,13 @@ from app.schemas.festival_interaction import (
     FestivalStoryCreate,
     FestivalStoryUpdate,
     FestivalStoryOut,
-    FestivalStats
+    FestivalStats,
+    FestivalReminderCreate,
+    FestivalReminderOut,
+    FestivalDateSuggestionCreate,
+    FestivalDateSuggestionOut,
+    StoryReactionCreate,
+    StoryReactionOut
 )
 from app.crud.festival_interaction import festival_interaction
 
@@ -94,6 +100,21 @@ def delete_story(
     festival_interaction.delete_story(db=db, db_story=story)
 
 
+@router.post("/stories/{story_id}/reactions")
+def toggle_story_reaction(
+    story_id: UUID,
+    reaction_in: StoryReactionCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Toggle a reaction for a specific story.
+    """
+    if reaction_in.story_id != story_id:
+        raise HTTPException(status_code=400, detail="Path story_id and body story_id must match")
+    return festival_interaction.toggle_story_reaction(db=db, user_email=current_user.email, reaction_in=reaction_in)
+
+
 @router.get("/stats/{festival_id}", response_model=FestivalStats)
 def get_festival_stats(
     festival_id: UUID,
@@ -105,3 +126,66 @@ def get_festival_stats(
     Also returns whether the current user has reacted.
     """
     return festival_interaction.get_festival_stats(db=db, festival_id=festival_id, user_email=current_user.email)
+
+
+@router.post("/reminders", response_model=FestivalReminderOut)
+def set_reminder(
+    reminder_in: FestivalReminderCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Set or update reminder dates for a specific festival for the current user.
+    """
+    return festival_interaction.create_or_update_reminder(db=db, user_email=current_user.email, reminder_in=reminder_in)
+
+
+@router.get("/reminders", response_model=list[FestivalReminderOut])
+def get_reminders(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Get all active reminders for the current user.
+    """
+    return festival_interaction.get_user_reminders(db=db, user_email=current_user.email)
+
+
+@router.delete("/reminders/{festival_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_reminder(
+    festival_id: UUID,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Completely remove a reminder for a specific festival.
+    """
+    success = festival_interaction.remove_reminder(db=db, festival_id=festival_id, user_email=current_user.email)
+    if not success:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+
+
+@router.post("/suggestions", response_model=FestivalDateSuggestionOut)
+def suggest_festival_date(
+    suggestion_in: FestivalDateSuggestionCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    Suggest a new date for a festival that changes every year (e.g. crowdsourced variable).
+    """
+    return festival_interaction.suggest_date(db=db, user_email=current_user.email, suggestion_in=suggestion_in)
+
+
+@router.post("/views/{festival_id}", status_code=status.HTTP_200_OK)
+def increment_festival_views(
+    festival_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """
+    Increment the view count of a festival when a user opens the details page.
+    """
+    success = festival_interaction.increment_views(db=db, festival_id=festival_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Festival not found")
+    return {"message": "View incremented successfully"}

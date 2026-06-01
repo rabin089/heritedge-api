@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Float, Text, Boolean, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, String, Float, Text, Boolean, DateTime, ForeignKey, Enum, Integer
 from sqlalchemy.dialects.postgresql import ARRAY, UUID, JSONB
 from sqlalchemy.orm import relationship, backref
 from app.core.database import Base
@@ -17,6 +17,12 @@ class FestivalStatus(str, enum.Enum):
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
+
+
+class DateDeterminationType(str, enum.Enum):
+    fixed_gregorian = "fixed_gregorian"
+    api_synced_lunar = "api_synced_lunar"
+    crowdsourced_variable = "crowdsourced_variable"
 
 
 class Festival(Base):
@@ -41,6 +47,9 @@ class Festival(Base):
     gallery = Column(ARRAY(String))
     
     is_annual = Column(Boolean, default=False)
+    views_count = Column(Integer, default=0)
+    date_determination = Column(Enum(DateDeterminationType), default=DateDeterminationType.fixed_gregorian)
+    last_verified_year = Column(Integer, nullable=True)
     
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
@@ -54,6 +63,7 @@ class Festival(Base):
     contributions = relationship("Contribution", back_populates="festival")
     reactions = relationship("FestivalReaction", back_populates="festival", cascade="all, delete-orphan")
     stories = relationship("FestivalStory", back_populates="festival", cascade="all, delete-orphan")
+    reminders = relationship("FestivalReminder", back_populates="festival", cascade="all, delete-orphan")
 
     @property
     def contributor_id(self):

@@ -69,6 +69,19 @@ def list_festivals(
     )
 
 
+@router.get("/festivals/calendar", response_model=List[FestivalOut])
+def get_festival_calendar(
+    year: Optional[int] = Query(None, description="Year to fetch festivals for"),
+    month: Optional[int] = Query(None, ge=1, le=12, description="Month to fetch festivals for (1-12)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all approved festivals suitable for rendering in a global calendar.
+    Can be optionally filtered by year and month.
+    """
+    return festival_crud.get_calendar_festivals(db, year=year, month=month)
+
+
 @router.get("/festivals/upcoming", response_model=List[FestivalOut])
 def list_upcoming_festivals(
     limit: int = Query(10, ge=1, le=50, description="Maximum number of festivals"),

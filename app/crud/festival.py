@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session, joinedload
+from app.services.notification_service import notify_user
 from sqlalchemy import and_, or_, func, text, cast
 from sqlalchemy.dialects.postgresql import JSONB
 from app.models.festival import Festival, FestivalHeritageSite, FestivalStatus, FestivalCategory
@@ -121,10 +122,21 @@ class FestivalCRUD:
         """Approve a festival"""
         festival = self.get(db, festival_id)
         if festival:
-            festival.status = FestivalStatus.approved
             festival.moderation_note = approval_reason
             db.commit()
             db.refresh(festival)
+            
+            # NOTIFY: Festival Approved
+            from app.models.user import User
+            owner = db.query(User).filter(User.id == festival.created_by).first()
+            if owner:
+                notify_user(
+                    db=db,
+                    user_email=owner.email,
+                    title="✅ Festival Approved!",
+                    body=f"Great news! Your festival '{festival.name}' has been approved and is now live on Heritedge.",
+                    data={"type": "festival_approved", "festival_id": str(festival_id), "screen": "festival_detail"}
+                )
         return festival
 
     def reject(
@@ -137,10 +149,21 @@ class FestivalCRUD:
         """Reject a festival"""
         festival = self.get(db, festival_id)
         if festival:
-            festival.status = FestivalStatus.rejected
             festival.moderation_note = rejection_reason
             db.commit()
             db.refresh(festival)
+            
+            # NOTIFY: Festival Rejected/Changes Requested
+            from app.models.user import User
+            owner = db.query(User).filter(User.id == festival.created_by).first()
+            if owner:
+                notify_user(
+                    db=db,
+                    user_email=owner.email,
+                    title="📝 Update needed for your festival",
+                    body=f"The moderators have requested changes for '{festival.name}'. Check the note for details.",
+                    data={"type": "festival_rejected", "festival_id": str(festival_id), "screen": "festival_edit"}
+                )
         return festival
 
     def delete(self, db: Session, festival_id: UUID) -> bool:
@@ -171,6 +194,20 @@ class FestivalCRUD:
                 Festival.end_date >= now
             )
         ).all()
+
+    def get_calendar_festivals(self, db: Session, year: Optional[int] = None, month: Optional[int] = None) -> List[Festival]:
+        """Get approved festivals filtered by optional year and month for calendar views"""
+        from sqlalchemy import extract
+        query = db.query(Festival).options(joinedload(Festival.user)).filter(
+            Festival.status == FestivalStatus.approved
+        )
+        
+        if year:
+            query = query.filter(extract('year', Festival.start_date) == year)
+        if month:
+            query = query.filter(extract('month', Festival.start_date) == month)
+            
+        return query.order_by(Festival.start_date).all()
 
 
 class FestivalHeritageSiteCRUD:

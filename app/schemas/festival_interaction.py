@@ -48,8 +48,27 @@ class FestivalStoryOut(BaseModel):
     user_email: str
     content: str
     media_urls: Optional[List[str]] = None
+    reactions_count: int = 0
+    user_has_reacted: bool = False
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class StoryReactionCreate(BaseModel):
+    story_id: UUID = Field(..., description="Story UUID")
+    reaction_type: str = Field(default="heart", description="Type of reaction")
+
+    class Config:
+        from_attributes = True
+
+class StoryReactionOut(BaseModel):
+    id: UUID
+    story_id: UUID
+    user_email: str
+    reaction_type: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -60,6 +79,54 @@ class FestivalStats(BaseModel):
     total_reactions: int = 0
     total_stories: int = 0
     user_has_reacted: bool = False
+    
+    class Config:
+        from_attributes = True
+
+
+# Reminders
+class FestivalReminderCreate(BaseModel):
+    festival_id: UUID = Field(..., description="Festival UUID")
+    reminder_dates: List[datetime] = Field(..., description="Array of exact datetimes to remind the user")
+    is_active: Optional[bool] = True
+
+    class Config:
+        from_attributes = True
+
+
+class FestivalReminderOut(BaseModel):
+    id: UUID
+    festival_id: UUID
+    user_email: str
+    reminder_dates: List[datetime]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Date Suggestions
+class FestivalDateSuggestionCreate(BaseModel):
+    festival_id: UUID = Field(..., description="Festival UUID")
+    proposed_start_date: datetime
+    proposed_end_date: datetime
+    proposed_nepali_date: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class FestivalDateSuggestionOut(BaseModel):
+    id: UUID
+    festival_id: UUID
+    user_email: str
+    proposed_start_date: datetime
+    proposed_end_date: datetime
+    proposed_nepali_date: Optional[str] = None
+    status: str
+    created_at: datetime
     
     class Config:
         from_attributes = True

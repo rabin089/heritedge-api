@@ -2,15 +2,62 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+from contextlib import asynccontextmanager
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from dotenv import load_dotenv
 import os
+import logging
 from app.api.v1.routes import router as api_router
 from app.seed_data import seed_database
+from app.services.scheduler_jobs import send_reminder_notifications, ping_contributors_for_dates
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="HeritEdge API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application startup and shutdown lifecycle."""
+    # --- STARTUP ---
+    seed_on_startup = os.getenv("SEED_ON_STARTUP", "false").lower() in {"1", "true", "yes", "y"}
+    if seed_on_startup:
+        try:
+            seed_database()
+        except Exception as e:
+            logger.error(f"Error during startup seeding: {e}")
+
+    # Start background scheduler
+    scheduler = BackgroundScheduler(timezone="UTC")
+
+    # Daily reminder job — runs at 02:15 UTC (08:00 NPT)
+    scheduler.add_job(
+        send_reminder_notifications,
+        CronTrigger(hour=2, minute=15),
+        id="reminder_notifications",
+        replace_existing=True
+    )
+
+    # Monthly contributor ping — runs on 1st of every month at 03:30 UTC (09:15 NPT)
+    scheduler.add_job(
+        ping_contributors_for_dates,
+        CronTrigger(day=1, hour=3, minute=30),
+        id="contributor_ping",
+        replace_existing=True
+    )
+
+    scheduler.start()
+    logger.info("✅ APScheduler started with reminder and contributor ping jobs.")
+
+    yield  # App is running
+
+    # --- SHUTDOWN ---
+    scheduler.shutdown(wait=False)
+    logger.info("APScheduler shut down.")
+
+
+app = FastAPI(title="HeritEdge API", lifespan=lifespan)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -42,19 +89,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 # Add your route groups
+# 1. Standard API versioning (Preferred)
+app.include_router(api_router, prefix="/api/v1")
+
+# 2. Legacy support (Root level routes for existing Flutter code)
 app.include_router(api_router)
 
-@app.on_event("startup")
-async def startup_event():
-    """Seed initial data on startup"""
-    seed_on_startup = os.getenv("SEED_ON_STARTUP", "false").lower() in {"1", "true", "yes", "y"}
-    if not seed_on_startup:
-        return
 
-    try:
-        seed_database()
-    except Exception as e:
-        print(f"Error during startup seeding: {e}")
 
 @app.get("/")
 def read_root():

@@ -14,6 +14,7 @@ from app.models import user_favorite
 from app.models import site_review
 from app.models import festival
 from app.models import festival_interaction
+from app.models import user_device
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
