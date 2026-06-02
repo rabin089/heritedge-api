@@ -13,8 +13,8 @@ class ContributionBase(BaseModel):
     category: Optional[str] = None
     region: Optional[str] = None
     location: Optional[str] = None
-    latitude: float
-    longitude: float
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     image_url: Optional[str] = None
     secondary_images: Optional[List[str]] = None
     tags: Optional[List[str]] = None
@@ -24,6 +24,14 @@ class ContributionBase(BaseModel):
     significance: Optional[str] = None
     nepali_date: Optional[str] = None
     is_annual: bool = False
+
+    # Intangible Heritage fields
+    community: Optional[str] = None
+    language: Optional[str] = None
+    risk_level: Optional[str] = None
+    practiced_at: Optional[str] = None
+    video_url: Optional[str] = None
+    audio_url: Optional[str] = None
 
 
 class ContributionCreate(ContributionBase):
@@ -68,3 +76,4 @@ class ApproveContributionOut(BaseModel):
     contribution_id: UUID
     heritage_site_id: Optional[UUID] = None
     festival_id: Optional[UUID] = None
+    intangible_id: Optional[UUID] = None

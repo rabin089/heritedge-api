@@ -122,6 +122,7 @@ class FestivalCRUD:
         """Approve a festival"""
         festival = self.get(db, festival_id)
         if festival:
+            festival.status = FestivalStatus.approved
             festival.moderation_note = approval_reason
             db.commit()
             db.refresh(festival)
@@ -149,6 +150,7 @@ class FestivalCRUD:
         """Reject a festival"""
         festival = self.get(db, festival_id)
         if festival:
+            festival.status = FestivalStatus.rejected
             festival.moderation_note = rejection_reason
             db.commit()
             db.refresh(festival)

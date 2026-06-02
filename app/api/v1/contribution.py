@@ -142,12 +142,13 @@ def approve_contribution(
     result = crud.approve_contribution(db, contrib_id, admin_user_id=current_user.id, comment=comment)
     if not result:
         raise HTTPException(status_code=400, detail="Contribution not found or not pending")
-    contrib, site_id, fest_id = result
+    contrib, site_id, fest_id, intangible_id = result
     return {
         "message": "Approved",
         "contribution_id": contrib.id,
         "heritage_site_id": site_id,
-        "festival_id": fest_id
+        "festival_id": fest_id,
+        "intangible_id": intangible_id
     }
 
 

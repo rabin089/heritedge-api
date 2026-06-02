@@ -1,3 +1,10 @@
+from app.models.festival_interaction import FestivalReaction
+from app.models.festival import Festival
+from app.schemas.festival_interaction import AdminStoryDeleteInfo
+from app.models.festival_interaction import StoryReaction
+from app.schemas.festival_interaction import FestivalStoryOut
+from app.schemas.festival_interaction import AdminStoryListResponse
+from app.models.festival_interaction import FestivalStory
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -22,6 +29,9 @@ from app.schemas.site_review import (
     SiteReviewOut, SiteRatingOut
 )
 from app.crud import site_review as review_crud
+from app.schemas.admin_detail import (
+    AdminContributionDetail, AdminUserDetail
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -165,9 +175,15 @@ def list_pending_contributions(
     if not (is_admin(current_user) or is_reviewer(current_user)):
         raise HTTPException(status_code=403, detail="Admin or reviewer only")
     items, total = contrib_crud.admin_list_pending_contributions(db, region, category, q, page, page_size)
-    # Use ContributionOut for items via FastAPI's response model conversion
+    admin_items = []
+    for i in items:
+        detail = AdminContributionDetail.model_validate(i)
+        if i.creator_details:
+            detail.creator_details = AdminUserDetail.model_validate(i.creator_details)
+        admin_items.append(detail)
+
     return {
-        "items": [ContributionOut.model_validate(i) for i in items],
+        "items": admin_items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -198,11 +214,18 @@ def user_contribution_history(
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
     items, total = contrib_crud.admin_user_contribution_history(db, u.email, page, page_size, status)
+    admin_items = []
+    for i in items:
+        detail = AdminContributionDetail.model_validate(i)
+        if i.creator_details:
+            detail.creator_details = AdminUserDetail.model_validate(i.creator_details)
+        admin_items.append(detail)
+
     return {
         "user_id": u.id,
         "user_email": u.email,
         "user_name": u.display_name,  # Use display_name for admin identity
-        "items": [ContributionOut.model_validate(i) for i in items],
+        "items": admin_items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -443,3 +466,106 @@ def admin_get_user_ratings(
         page=page,
         page_size=page_size
     )
+
+
+# ==================== ADMIN FESTIVAL MANAGEMENT ====================
+
+
+
+
+@router.get("/festivals/{festival_id}/stats")
+def admin_festival_stats(
+    festival_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin: Get detailed stats for a single festival — story count, reaction count, view count."""
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    festival = db.query(Festival).filter(Festival.id == festival_id).first()
+    if not festival:
+        raise HTTPException(status_code=404, detail="Festival not found")
+    
+    story_count = db.query(FestivalStory).filter(FestivalStory.festival_id == festival_id).count()
+    reaction_count = db.query(FestivalReaction).filter(FestivalReaction.festival_id == festival_id).count()
+    
+    return {
+        "festival_id": str(festival_id),
+        "name": festival.name,
+        "status": festival.status,
+        "views_count": festival.views_count or 0,
+        "story_count": story_count,
+        "reaction_count": reaction_count,
+    }
+
+
+# ==================== ADMIN STORY MANAGEMENT ====================
+
+@router.get("/stories", response_model=AdminStoryListResponse)
+def admin_list_all_stories(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    festival_id: Optional[UUID] = Query(None, description="Filter stories by festival"),
+    q: Optional[str] = Query(None, description="Search by story content"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Admin: List ALL festival stories across all festivals.
+    Supports filtering by festival and text search.
+    Use this to monitor stories for community standards.
+    """
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    query = db.query(FestivalStory)
+    if festival_id:
+        query = query.filter(FestivalStory.festival_id == festival_id)
+    if q:
+        query = query.filter(FestivalStory.content.ilike(f"%{q}%"))
+    
+    total = query.count()
+    stories = query.order_by(FestivalStory.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    
+    return AdminStoryListResponse(
+        stories=[FestivalStoryOut.model_validate(s) for s in stories],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.delete("/stories/{story_id}", response_model=AdminStoryDeleteInfo)
+def admin_delete_story(
+    story_id: UUID,
+    reason: Optional[str] = Query(None, description="Reason for removal (community standards, etc.)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Admin/Superadmin: Delete ANY festival story.
+    Use the 'reason' query param to record why it was removed (e.g. 'Violated community standards').
+    The author is NOT notified automatically here — add a notification call if needed.
+    """
+    if not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Admin only")
+    
+    story = db.query(FestivalStory).filter(FestivalStory.id == story_id).first()
+    if not story:
+        raise HTTPException(status_code=404, detail="Story not found")
+    
+    # Also delete all child reactions for this story
+    db.query(StoryReaction).filter(StoryReaction.story_id == story_id).delete()
+    db.delete(story)
+    db.commit()
+    
+    return AdminStoryDeleteInfo(
+        message="Story removed successfully.",
+        story_id=story_id,
+        deleted_by=current_user.email,
+        reason=reason or "Removed by admin",
+    )
+
+
+

@@ -16,6 +16,7 @@ class ContributionStatus(str, enum.Enum):
 class ContributionType(str, enum.Enum):
     site = "site"
     festival = "festival"
+    intangible = "intangible"
 
 
 class Contribution(Base):
@@ -41,6 +42,14 @@ class Contribution(Base):
     significance = Column(Text, nullable=True)
     nepali_date = Column(String, nullable=True)
     is_annual = Column(Boolean, default=False)
+
+    # For Intangible Heritage type specifically
+    community = Column(String(100), nullable=True)
+    language = Column(String(100), nullable=True)
+    risk_level = Column(String(20), nullable=True)
+    practiced_at = Column(String(255), nullable=True)
+    video_url = Column(String, nullable=True)  # Main video contribution
+    audio_url = Column(String, nullable=True)  # Main audio contribution
 
     status = Column(Enum(ContributionStatus), default=ContributionStatus.pending, nullable=False)
     # unified status reason to record approval comment or rejection reason

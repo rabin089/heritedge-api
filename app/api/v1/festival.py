@@ -1,5 +1,6 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -14,6 +15,12 @@ from app.models.festival import Festival, FestivalStatus, FestivalCategory
 from app.api.v1._role import is_admin, is_reviewer
 from app.api.v1.auth import get_current_user
 from app.models.user import User
+from app.schemas.admin_detail import (
+    AdminFestivalListResponse, AdminFestivalDetail, AdminUserDetail
+)
+from app.crud import contributions as contrib_crud
+from app.schemas.contribution import ContributionCreate, ContributionOut
+from app.models.contribution import ContributionType
 
 router = APIRouter(tags=["festival"])
 
@@ -113,20 +120,58 @@ def get_festival(
 
 
 # Protected endpoints (authentication required)
-@router.post("/festivals", response_model=FestivalOut)
+@router.post("/festivals", response_model=FestivalOut, responses={202: {"model": ContributionOut}})
 def create_festival(
     festival_in: FestivalCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Create a new festival (requires authentication)"""
-    # Auto-approve if created by admin/superadmin
-    status = FestivalStatus.pending
+    """
+    Submit a festival.
+    - **Admin/Superadmin**: Festival is created directly and marked as approved.
+    - **Regular user**: Festival is queued as a pending Contribution. It will
+      appear in the Admin review list under GET /admin/contributions/pending
+      (type=festival). Once approved, it will be published to the festivals table.
+    """
+    # Admin: create directly and mark approved
     if is_admin(current_user):
-        status = FestivalStatus.approved
-        
-    festival = festival_crud.create(db, festival_in, str(current_user.id), status=status)
-    return festival
+        festival = festival_crud.create(db, festival_in, str(current_user.id), status=FestivalStatus.approved)
+        return festival
+
+    # Regular user: go through contribution review queue
+    contrib_payload = ContributionCreate(
+        type=ContributionType.festival,
+        name=festival_in.name,
+        description=festival_in.description,
+        category=festival_in.category.value if festival_in.category else None,
+        region=festival_in.region,
+        location=festival_in.location,
+        start_date=festival_in.start_date,
+        end_date=festival_in.end_date,
+        significance=festival_in.significance,
+        nepali_date=festival_in.nepali_date,
+        is_annual=festival_in.is_annual,
+        image_url=festival_in.main_image,
+        secondary_images=festival_in.gallery,
+        tags=festival_in.tags,
+        latitude=festival_in.locations[0].get("lat") if festival_in.locations else None,
+        longitude=festival_in.locations[0].get("lng") if festival_in.locations else None,
+        contributor_name=current_user.display_name or current_user.name,
+        contributor_email=current_user.email,
+    )
+    contrib = contrib_crud.create_contribution(db, contrib_payload, user_id=current_user.email)
+
+    # Return a 202 Accepted with the contribution details so the frontend knows
+    # the festival is under review, not yet published.
+    return JSONResponse(
+        status_code=202,
+        content={
+            "message": "Festival submitted for review. It will be published once an admin approves it.",
+            "contribution_id": str(contrib.id),
+            "status": contrib.status,
+            "type": contrib.type,
+        }
+    )
 
 
 @router.get("/festivals/me", response_model=FestivalListResponse)
@@ -198,7 +243,7 @@ def delete_festival(
 
 
 # Admin endpoints (admin/superadmin only)
-@router.get("/admin/festivals", response_model=FestivalListResponse)
+@router.get("/admin/festivals", response_model=AdminFestivalListResponse)
 def admin_list_festivals(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -211,7 +256,7 @@ def admin_list_festivals(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Admin endpoint to list all festivals"""
+    """Admin endpoint to list all festivals with full metadata and creator details"""
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin only")
     skip = (page - 1) * page_size
@@ -229,8 +274,17 @@ def admin_list_festivals(
         include_unapproved=True
     )
     
-    return FestivalListResponse(
-        items=festivals,
+    admin_items = []
+    for fest in festivals:
+        item = AdminFestivalDetail.model_validate(fest)
+        if fest.user:
+            item.creator_details = AdminUserDetail.model_validate(fest.user)
+        # Assuming story_count and reaction_count properties don't exist by default in model,
+        # fallback to 0 or calculate if needed, but for list view this is enough
+        admin_items.append(item)
+    
+    return AdminFestivalListResponse(
+        items=admin_items,
         total=total,
         page=page,
         page_size=page_size
@@ -240,19 +294,23 @@ def admin_list_festivals(
 @router.post("/admin/festivals/{festival_id}/approve")
 def approve_festival(
     festival_id: UUID,
-    approval: FestivalApproval,
+    approval: Optional[FestivalApproval] = Body(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Approve or reject a festival (Admin only)"""
+    """Approve or reject a festival (Admin only). Body is optional — no body = approve."""
     if not is_admin(current_user):
         raise HTTPException(status_code=403, detail="Admin or Super Admin only")
     
+    # Default to approve if no body is sent
+    if approval is None:
+        approval = FestivalApproval()  # uses defaults: is_approved=True, status=approved
+
     # We use status primarily now, but keep is_approved for legacy
     status = approval.status
     if not status:
         status = FestivalStatus.approved if approval.is_approved else FestivalStatus.rejected
-        
+
     if status == FestivalStatus.approved:
         festival = festival_crud.approve(db, festival_id, str(current_user.id), approval.rejection_reason)
         if festival:
@@ -271,7 +329,7 @@ def approve_festival(
              festival.moderation_note = approval.rejection_reason
              db.commit()
              return {"message": "Festival set to pending", "festival_id": str(festival_id)}
-            
+
     raise HTTPException(status_code=404, detail="Festival not found or invalid status provided")
 
 

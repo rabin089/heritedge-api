@@ -3,6 +3,7 @@ from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey, Uniq
 from sqlalchemy.dialects.postgresql import UUID, ARRAY
 from sqlalchemy.orm import relationship
 from app.core.database import Base
+from app.models.user import User
 import uuid
 
 
@@ -15,8 +16,20 @@ class FestivalReaction(Base):
     reaction_type = Column(String, default="heart", nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+    @property
+    def user_name(self) -> str:
+        if self.user:
+            return self.user.display_name or self.user.name or "Contributor"
+        return "Contributor"
+
     # Relationships
     festival = relationship("Festival", back_populates="reactions")
+    user = relationship(
+        "User",
+        primaryjoin="foreign(FestivalReaction.user_email) == User.email",
+        viewonly=True,
+        uselist=False
+    )
 
     # Constraints
     __table_args__ = (
@@ -35,9 +48,25 @@ class FestivalStory(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+    @property
+    def user_name(self) -> str:
+        if self.user:
+            return self.user.display_name or self.user.name or "Storyteller"
+        return "Storyteller"
+
+    @property
+    def reactions_count(self) -> int:
+        return len(self.reactions) if self.reactions else 0
+
     # Relationships
     festival = relationship("Festival", back_populates="stories")
     reactions = relationship("StoryReaction", back_populates="story", cascade="all, delete-orphan")
+    user = relationship(
+        "User",
+        primaryjoin="foreign(FestivalStory.user_email) == User.email",
+        viewonly=True,
+        uselist=False
+    )
 
     # Constraints
     __table_args__ = (
@@ -61,6 +90,12 @@ class FestivalReminder(Base):
 
     # Relationships
     festival = relationship("Festival", back_populates="reminders")
+    user = relationship(
+        "User",
+        primaryjoin="foreign(FestivalReminder.user_email) == User.email",
+        viewonly=True,
+        uselist=False
+    )
 
 
 class FestivalDateSuggestion(Base):
@@ -80,6 +115,12 @@ class FestivalDateSuggestion(Base):
 
     # Relationships
     festival = relationship("Festival", backref="date_suggestions")
+    user = relationship(
+        "User",
+        primaryjoin="foreign(FestivalDateSuggestion.user_email) == User.email",
+        viewonly=True,
+        uselist=False
+    )
 
 class StoryReaction(Base):
     __tablename__ = "story_reactions"
@@ -90,8 +131,20 @@ class StoryReaction(Base):
     reaction_type = Column(String, default="heart", nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
+    @property
+    def user_name(self) -> str:
+        if self.user:
+            return self.user.display_name or self.user.name or "Someone"
+        return "Someone"
+
     # Relationships
     story = relationship("FestivalStory", back_populates="reactions")
+    user = relationship(
+        "User",
+        primaryjoin="foreign(StoryReaction.user_email) == User.email",
+        viewonly=True,
+        uselist=False
+    )
 
     # Constraints
     __table_args__ = (

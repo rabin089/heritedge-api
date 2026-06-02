@@ -16,7 +16,7 @@ class FestivalReactionCreate(BaseModel):
 class FestivalReactionOut(BaseModel):
     id: UUID
     festival_id: UUID
-    user_email: str
+    user_name: str
     reaction_type: str
     created_at: datetime
 
@@ -45,7 +45,7 @@ class FestivalStoryUpdate(BaseModel):
 class FestivalStoryOut(BaseModel):
     id: UUID
     festival_id: UUID
-    user_email: str
+    user_name: str
     content: str
     media_urls: Optional[List[str]] = None
     reactions_count: int = 0
@@ -66,7 +66,7 @@ class StoryReactionCreate(BaseModel):
 class StoryReactionOut(BaseModel):
     id: UUID
     story_id: UUID
-    user_email: str
+    user_name: str
     reaction_type: str
     created_at: datetime
 
@@ -97,7 +97,7 @@ class FestivalReminderCreate(BaseModel):
 class FestivalReminderOut(BaseModel):
     id: UUID
     festival_id: UUID
-    user_email: str
+    user_name: str
     reminder_dates: List[datetime]
     is_active: bool
     created_at: datetime
@@ -121,7 +121,7 @@ class FestivalDateSuggestionCreate(BaseModel):
 class FestivalDateSuggestionOut(BaseModel):
     id: UUID
     festival_id: UUID
-    user_email: str
+    user_name: str
     proposed_start_date: datetime
     proposed_end_date: datetime
     proposed_nepali_date: Optional[str] = None
@@ -130,3 +130,18 @@ class FestivalDateSuggestionOut(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# Admin Story Management
+class AdminStoryListResponse(BaseModel):
+    stories: List[FestivalStoryOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class AdminStoryDeleteInfo(BaseModel):
+    message: str
+    story_id: UUID
+    deleted_by: str
+    reason: Optional[str] = None

@@ -91,9 +91,8 @@ class FestivalOut(FestivalBase):
 
 
 class FestivalApproval(BaseModel):
-    is_approved: bool # Wait, model changed status to Enum. This legacy endpoint might need adjustment or removal?
-    # If using status Enum, approval implies status='approved'.
-    status: FestivalStatus 
+    is_approved: bool = True  # defaults to approve
+    status: Optional[FestivalStatus] = FestivalStatus.approved  # defaults to approved
     rejection_reason: Optional[str] = None
 
 

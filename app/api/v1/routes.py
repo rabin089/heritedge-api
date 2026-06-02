@@ -1,5 +1,9 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, heritage, contribution, admin, favorites, notification, site_review, upload, geocoding, festival, festival_interaction, user_device
+from app.api.v1 import (
+    auth, heritage, contribution, admin, favorites, 
+    notification, site_review, upload, geocoding, 
+    festival, festival_interaction, user_device, intangible
+)
 
 router = APIRouter()
 
@@ -14,5 +18,6 @@ router.include_router(notification.router)
 router.include_router(festival.router)
 router.include_router(festival_interaction.router)
 router.include_router(user_device.router)
+router.include_router(intangible.router)
 router.include_router(upload.router)
 router.include_router(geocoding.router)

@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.contribution import Contribution, ContributionStatus, ContributionType
 from app.models.heritage_site import HeritageSite
 from app.models.festival import Festival, FestivalStatus
+from app.models.intangible_heritage import IntangibleHeritage, IntangibleMedia
 from uuid import UUID
 from app.schemas.contribution import ContributionCreate, ContributionUpdate
 from app.schemas.heritage_site import HeritageSiteCreate
@@ -137,8 +138,48 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
     approved_item = None
     heritage_site_id = None
     festival_id = None
+    intangible_id = None
 
-    if row.type == ContributionType.festival:
+    if row.type == ContributionType.intangible:
+        # Create intangible heritage
+        approved_item = IntangibleHeritage(
+            name=row.name,
+            description=row.description,
+            category=row.category,
+            community=row.community,
+            language=row.language,
+            risk_level=row.risk_level,
+            location_id=row.festival_id, # Reusing festival_id field for location mapping if provided
+            practiced_at=row.practiced_at,
+            created_by=row.created_by,
+            contribution_id=row.id,
+            status="approved"
+        )
+        db.add(approved_item)
+        db.flush()
+        intangible_id = approved_item.id
+
+        # Add media if URLs are present
+        if row.video_url:
+            db.add(IntangibleMedia(
+                intangible_id=intangible_id,
+                media_type="video",
+                media_url=row.video_url
+            ))
+        if row.audio_url:
+            db.add(IntangibleMedia(
+                intangible_id=intangible_id,
+                media_type="audio",
+                media_url=row.audio_url
+            ))
+        if row.image_url:
+            db.add(IntangibleMedia(
+                intangible_id=intangible_id,
+                media_type="photo",
+                media_url=row.image_url
+            ))
+            
+    elif row.type == ContributionType.festival:
         # Check if dates are provided, fallback to now if missing (though they should be provided)
         st = row.start_date or datetime.now(timezone.utc)
         en = row.end_date or datetime.now(timezone.utc)
@@ -225,7 +266,7 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
     if approved_item:
         db.refresh(approved_item)
     
-    return row, heritage_site_id, festival_id
+    return row, heritage_site_id, festival_id, intangible_id
 
 
 def reject_contribution(db: Session, contrib_id: UUID, reason: str, admin_user_id: str):
