@@ -80,7 +80,7 @@ def patch_contrib_crud(monkeypatch):
         return []
 
     def approve_contribution(db, contrib_id, admin_user_id, comment=None):
-        return (DummyContrib(contrib_id), types.SimpleNamespace(id=99))
+        return (DummyContrib(contrib_id), uuid.uuid4(), None, None)
 
     def reject_contribution(db, contrib_id, reason):
         c = DummyContrib(contrib_id)

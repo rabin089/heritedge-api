@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from datetime import datetime
 from app.models.contribution import ContributionStatus, ContributionType
@@ -9,6 +9,7 @@ from .users import UserMinimal
 class ContributionBase(BaseModel):
     type: ContributionType = ContributionType.site
     name: str
+    name_np: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     region: Optional[str] = None
@@ -23,7 +24,7 @@ class ContributionBase(BaseModel):
     end_date: Optional[datetime] = None
     significance: Optional[str] = None
     nepali_date: Optional[str] = None
-    is_annual: bool = False
+    is_annual: Optional[bool] = None
 
     # Intangible Heritage fields
     community: Optional[str] = None
@@ -32,6 +33,11 @@ class ContributionBase(BaseModel):
     practiced_at: Optional[str] = None
     video_url: Optional[str] = None
     audio_url: Optional[str] = None
+
+    @field_validator('is_annual', mode='before')
+    @classmethod
+    def convert_none_to_false(cls, v):
+        return False if v is None else v
 
 
 class ContributionCreate(ContributionBase):

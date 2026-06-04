@@ -26,6 +26,7 @@ class Contribution(Base):
     # submitted content (same fields as heritage site)
     type = Column(Enum(ContributionType), default=ContributionType.site, nullable=False)
     name = Column(String, nullable=False)
+    name_np = Column(String, nullable=True)
     description = Column(Text)
     category = Column(String)
     region = Column(String)

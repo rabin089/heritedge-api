@@ -145,7 +145,6 @@ def create_festival(
         description=festival_in.description,
         category=festival_in.category.value if festival_in.category else None,
         region=festival_in.region,
-        location=festival_in.location,
         start_date=festival_in.start_date,
         end_date=festival_in.end_date,
         significance=festival_in.significance,

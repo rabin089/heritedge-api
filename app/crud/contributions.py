@@ -8,10 +8,17 @@ from app.schemas.contribution import ContributionCreate, ContributionUpdate
 from app.schemas.heritage_site import HeritageSiteCreate
 from datetime import datetime, timezone
 from app.crud import notifications as notif_crud
+from datetime import datetime, timezone
+from app.crud import notifications as notif_crud
 from sqlalchemy import or_, func
+from app.utils.geocoding_util import get_location_name_from_coordinates
 
 
 def create_contribution(db: Session, data: ContributionCreate, user_id: str):
+    if data.latitude is not None and data.longitude is not None:
+        loc_name = get_location_name_from_coordinates(data.latitude, data.longitude)
+        if loc_name:
+            data.location = loc_name
     row = Contribution(**data.model_dump(), created_by=user_id)
     db.add(row)
     db.commit()
@@ -108,6 +115,12 @@ def update_my_pending_contribution(db: Session, contrib_id: UUID, user_id: str, 
     ).first()
     if not row:
         return None
+        
+    if data.latitude is not None and data.longitude is not None:
+        loc_name = get_location_name_from_coordinates(data.latitude, data.longitude)
+        if loc_name:
+            data.location = loc_name
+            
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(row, k, v)
     row.updated_at = datetime.now(timezone.utc)
@@ -141,18 +154,37 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
     intangible_id = None
 
     if row.type == ContributionType.intangible:
-        # Create intangible heritage
+        from app.models.user import User
+        from decimal import Decimal
+        
+        # Resolve created_by (email string) to user UUID
+        user = db.query(User).filter(User.email == row.created_by).first()
+        contributor_id = user.id if user else None
+        if not contributor_id:
+            try:
+                contributor_id = UUID(admin_user_id)
+            except (ValueError, TypeError):
+                # Fallback to any superadmin
+                admin = db.query(User).filter(User.role == "superadmin").first()
+                if admin:
+                    contributor_id = admin.id
+                else:
+                    # Final fallback to first user
+                    any_user = db.query(User).first()
+                    if any_user:
+                        contributor_id = any_user.id
+
         approved_item = IntangibleHeritage(
-            name=row.name,
+            name_en=row.name,
+            name_np=row.name_np or row.name, # Fallback to English name if Nepali is missing
             description=row.description,
-            category=row.category,
+            category=row.category or "other",
             community=row.community,
             language=row.language,
-            risk_level=row.risk_level,
             location_id=row.festival_id, # Reusing festival_id field for location mapping if provided
-            practiced_at=row.practiced_at,
-            created_by=row.created_by,
-            contribution_id=row.id,
+            practiced_at_description=row.practiced_at,
+            risk_level=row.risk_level or "stable",
+            contributor_id=contributor_id,
             status="approved"
         )
         db.add(approved_item)
@@ -164,19 +196,25 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
             db.add(IntangibleMedia(
                 intangible_id=intangible_id,
                 media_type="video",
-                media_url=row.video_url
+                media_url=row.video_url,
+                file_size_mb=Decimal("0.00"),
+                mime_type="video/mp4"
             ))
         if row.audio_url:
             db.add(IntangibleMedia(
                 intangible_id=intangible_id,
                 media_type="audio",
-                media_url=row.audio_url
+                media_url=row.audio_url,
+                file_size_mb=Decimal("0.00"),
+                mime_type="audio/mpeg"
             ))
         if row.image_url:
             db.add(IntangibleMedia(
                 intangible_id=intangible_id,
                 media_type="photo",
-                media_url=row.image_url
+                media_url=row.image_url,
+                file_size_mb=Decimal("0.00"),
+                mime_type="image/jpeg"
             ))
             
     elif row.type == ContributionType.festival:

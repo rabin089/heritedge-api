@@ -4,6 +4,7 @@ from uuid import UUID
 from app.models.heritage_site import HeritageSite
 from app.schemas.heritage_site import HeritageSiteCreate
 from datetime import datetime, timezone
+from app.utils.geocoding_util import get_location_name_from_coordinates
 
 
 def create_heritage_site(
@@ -12,6 +13,11 @@ def create_heritage_site(
     user_id: str,
     contribution_id: UUID | None = None
 ):
+    if site_data.latitude is not None and site_data.longitude is not None:
+        loc_name = get_location_name_from_coordinates(site_data.latitude, site_data.longitude)
+        if loc_name:
+            site_data.location = loc_name
+            
     site = HeritageSite(
         **site_data.model_dump(),
         created_by=user_id,
@@ -92,6 +98,11 @@ def delete_site(db: Session, site_id: UUID, acting_user_id: str | int):
 def update_heritage_site(db: Session, site_id: UUID, site_data: HeritageSiteCreate, acting_user_id: str | int | None = None):
     site = db.query(HeritageSite).filter(HeritageSite.id == site_id).first()
     if site:
+        if site_data.latitude is not None and site_data.longitude is not None:
+            loc_name = get_location_name_from_coordinates(site_data.latitude, site_data.longitude)
+            if loc_name:
+                site_data.location = loc_name
+                
         for k, v in site_data.model_dump(exclude_unset=True).items():
             setattr(site, k, v)
         if acting_user_id is not None:
