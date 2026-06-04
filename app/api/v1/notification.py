@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, status
 from typing import List
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
@@ -43,3 +43,45 @@ def unread_count(db: Session = Depends(get_db), current_user: User = Depends(get
 def mark_all_read(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     updated = crud.mark_all_read(db, current_user.email)
     return {"updated": updated}
+
+
+@router.post("/test-push")
+def test_push_notification(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    from app.models.user_settings import UserSettings
+    from app.models.user_device import UserDevice
+    from app.services.notification_service import notify_user, send_multicast_notification
+
+    # 1. Check if user settings has notifications enabled (defaults to True if not present)
+    settings = db.query(UserSettings).filter(UserSettings.user_email == current_user.email).first()
+    if settings and not settings.push_notifications_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Push notifications are disabled in your user settings."
+        )
+
+    # 1. Find all active device tokens for users whose notifications are enabled
+    tokens_query = (
+        db.query(UserDevice.fcm_token)
+        .join(UserSettings, UserSettings.user_email == UserDevice.user_email)
+        .filter(UserSettings.push_notifications_enabled == True, UserDevice.is_active == True)
+    )
+    tokens = [t[0] for t in tokens_query.all()]
+    if not tokens:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active device tokens found for any user with notifications enabled."
+        )
+
+    # 2. Send the multicast notification
+    result = send_multicast_notification(
+        tokens=tokens,
+        title="Test Broadcast Notification",
+        body="This is a test broadcast notification sent to all enabled users.",
+        data={"type": "test_broadcast"}
+    )
+    if result.get("success", 0) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to send broadcast notification via Firebase."
+        )
+    return {"message": "Test broadcast notification sent.", "result": result}

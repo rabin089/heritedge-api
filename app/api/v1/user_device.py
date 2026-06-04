@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone
+from uuid import UUID
 
 from app.core.database import get_db
 from app.api.v1.auth import get_current_user
@@ -17,7 +18,7 @@ class DeviceTokenRegister(BaseModel):
 
 
 class DeviceTokenOut(BaseModel):
-    id: str
+    id: UUID
     user_email: str
     fcm_token: str
     device_platform: Optional[str]

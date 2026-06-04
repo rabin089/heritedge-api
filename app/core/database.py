@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 
 _env_candidates = (
     os.getenv("DOTENV_FILE"),
-    ".env.development",
     ".env",
+    ".env.development",
 )
 for _env_file in _env_candidates:
     if _env_file and os.path.exists(_env_file):

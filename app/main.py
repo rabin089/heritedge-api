@@ -92,8 +92,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # 1. Standard API versioning (Preferred)
 app.include_router(api_router, prefix="/api/v1")
 
-# 2. Legacy support (Root level routes for existing Flutter code)
-app.include_router(api_router)
+# 2. Legacy support (Root level routes for existing Flutter code)  # Removed legacy include
 
 
 

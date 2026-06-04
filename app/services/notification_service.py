@@ -88,8 +88,16 @@ def notify_user(
     body: str,
     data: dict = None
 ) -> bool:
-    """Helper to find all active device tokens for a user and send a notification."""
+    """Helper to find all active device tokens for a user and send a notification, if settings permit."""
     from app.models.user_device import UserDevice
+    from app.models.user_settings import UserSettings
+    
+    # Check settings first
+    settings = db.query(UserSettings).filter(UserSettings.user_email == user_email).first()
+    if settings and not settings.push_notifications_enabled:
+        logger.info(f"Push notifications disabled for user {user_email}")
+        return False
+        
     tokens = [
         d.fcm_token for d in db.query(UserDevice).filter(
             UserDevice.user_email == user_email,
