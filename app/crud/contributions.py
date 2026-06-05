@@ -289,12 +289,18 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
 
     # In-app notification for contributor
     try:
+        region_str = f" in region {row.region}" if row.region else ""
+        type_str = row.type.value if hasattr(row.type, 'value') else str(row.type)
+        notif_msg = f"Your {type_str} contribution '{row.name}'{region_str} has been approved!"
+        if comment:
+            notif_msg += f"\n\nAdmin Comment: {comment}"
+            
         notif_crud.create_notification(
             db,
             recipient_email=row.created_by,
             type="contribution_approved",
-            title=f"Contribution #{row.id} approved",
-            message=comment or f"Your {row.type} contribution has been approved!",
+            title=f"Contribution Approved: {row.name}",
+            message=notif_msg,
         )
     except Exception:
         pass
@@ -317,12 +323,16 @@ def reject_contribution(db: Session, contrib_id: UUID, reason: str, admin_user_i
     row.updated_by = str(admin_user_id)
     row.updated_at = datetime.now(timezone.utc)
     try:
+        region_str = f" in region {row.region}" if row.region else ""
+        type_str = row.type.value if hasattr(row.type, 'value') else str(row.type)
+        notif_msg = f"Your {type_str} contribution '{row.name}'{region_str} has been rejected.\n\nReason: {reason}"
+        
         notif_crud.create_notification(
             db,
             recipient_email=row.created_by,
             type="contribution_rejected",
-            title=f"Contribution #{row.id} rejected",
-            message=reason,
+            title=f"Contribution Rejected: {row.name}",
+            message=notif_msg,
         )
     except Exception:
         pass
