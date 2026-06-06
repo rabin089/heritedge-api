@@ -3,6 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
 from decimal import Decimal
+from app.schemas.users import UserMinimal
 
 
 # Media Schemas
@@ -44,9 +45,11 @@ class IntangibleHeritageBase(BaseModel):
     risk_level: str = Field(default="stable", pattern="^(critical|endangered|stable)$")
 
 class IntangibleHeritageCreate(IntangibleHeritageBase):
-    pass
-    # media can be attached via separate endpoint or optionally included here
-    # typically media is handled via separate upload
+    # Media URLs — uploaded first via POST /upload/, then included here
+    image_url: Optional[str] = None
+    secondary_images: Optional[List[str]] = None
+    video_url: Optional[str] = None
+    audio_url: Optional[str] = None
 
 class IntangibleHeritageUpdate(BaseModel):
     name_np: Optional[str] = Field(None, min_length=3, max_length=255)
@@ -63,6 +66,7 @@ class IntangibleHeritageUpdate(BaseModel):
 class IntangibleHeritageOut(IntangibleHeritageBase):
     id: UUID
     contributor_id: UUID
+    creator_details: Optional[UserMinimal] = None
     status: str
     approved_by: Optional[UUID] = None
     approval_notes: Optional[str] = None

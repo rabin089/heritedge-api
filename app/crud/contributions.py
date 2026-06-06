@@ -216,6 +216,16 @@ def approve_contribution(db: Session, contrib_id: UUID, admin_user_id: str, comm
                 file_size_mb=Decimal("0.00"),
                 mime_type="image/jpeg"
             ))
+        if row.secondary_images:
+            for idx, img_url in enumerate(row.secondary_images):
+                db.add(IntangibleMedia(
+                    intangible_id=intangible_id,
+                    media_type="photo",
+                    media_url=img_url,
+                    file_size_mb=Decimal("0.00"),
+                    mime_type="image/jpeg",
+                    sort_order=idx + 1
+                ))
             
     elif row.type == ContributionType.festival:
         # Check if dates are provided, fallback to now if missing (though they should be provided)

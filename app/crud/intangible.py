@@ -7,14 +7,14 @@ def get_intangible_by_id(db: Session, intangible_id: UUID):
     return db.query(IntangibleHeritage).options(
         joinedload(IntangibleHeritage.media),
         joinedload(IntangibleHeritage.creator_details)
-    ).filter(IntangibleHeritage.id == intangible_id, IntangibleHeritage.is_deleted == False).first()
+    ).filter(IntangibleHeritage.id == intangible_id, IntangibleHeritage.deleted_at == None).first()
 
 
 def list_intangible_heritage(db: Session, category: str = None, community: str = None):
     q = db.query(IntangibleHeritage).options(
         joinedload(IntangibleHeritage.media),
         joinedload(IntangibleHeritage.creator_details)
-    ).filter(IntangibleHeritage.is_deleted == False)
+    ).filter(IntangibleHeritage.deleted_at == None)
     
     if category:
         q = q.filter(IntangibleHeritage.category == category)

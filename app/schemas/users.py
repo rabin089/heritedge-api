@@ -4,6 +4,7 @@ from uuid import UUID
 from datetime import datetime
 
 class UserMinimal(BaseModel):
+    id: UUID
     name: Optional[str] = ""
     display_name: Optional[str] = ""
     email: EmailStr

@@ -59,6 +59,10 @@ def create_tradition(
         festival_id=payload.location_id, # Reusing festival_id column to map location_id
         practiced_at=payload.practiced_at_description,
         risk_level=payload.risk_level,
+        image_url=payload.image_url,
+        secondary_images=payload.secondary_images,
+        video_url=payload.video_url,
+        audio_url=payload.audio_url,
         contributor_name=current_user.display_name or current_user.name,
         contributor_email=current_user.email,
     )

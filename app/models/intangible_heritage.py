@@ -56,6 +56,8 @@ class IntangibleHeritage(Base):
     location = relationship("HeritageSite")
     contributor = relationship("User", foreign_keys=[contributor_id])
     approver = relationship("User", foreign_keys=[approved_by])
+    # Alias used by schemas and CRUD for consistent contributor_details pattern
+    creator_details = relationship("User", foreign_keys=[contributor_id], viewonly=True)
 
     media = relationship("IntangibleMedia", back_populates="intangible", cascade="all, delete-orphan")
     engagement = relationship("IntangibleEngagement", back_populates="intangible", cascade="all, delete-orphan")

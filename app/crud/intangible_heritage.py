@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from typing import List, Optional
 from uuid import UUID
@@ -12,18 +12,74 @@ from app.schemas.intangible_heritage import (
 
 
 def create_intangible_heritage(db: Session, obj_in: IntangibleHeritageCreate, user_id: UUID) -> IntangibleHeritage:
+    from decimal import Decimal
+
+    # Exclude media fields — they don't exist as columns on IntangibleHeritage
+    media_fields = {'image_url', 'secondary_images', 'video_url', 'audio_url'}
+    heritage_data = obj_in.model_dump(exclude=media_fields)
+
     db_obj = IntangibleHeritage(
-        **obj_in.model_dump(),
+        **heritage_data,
         contributor_id=user_id
     )
     db.add(db_obj)
+    db.flush()  # Get the ID before adding media
+
+    # Create IntangibleMedia rows from provided URLs
+    if obj_in.image_url:
+        db.add(IntangibleMedia(
+            intangible_id=db_obj.id,
+            media_type="photo",
+            media_url=obj_in.image_url,
+            file_size_mb=Decimal("0.00"),
+            mime_type="image/jpeg",
+            uploaded_by=user_id
+        ))
+    if obj_in.secondary_images:
+        for idx, img_url in enumerate(obj_in.secondary_images):
+            db.add(IntangibleMedia(
+                intangible_id=db_obj.id,
+                media_type="photo",
+                media_url=img_url,
+                file_size_mb=Decimal("0.00"),
+                mime_type="image/jpeg",
+                uploaded_by=user_id,
+                sort_order=idx + 1
+            ))
+    if obj_in.video_url:
+        db.add(IntangibleMedia(
+            intangible_id=db_obj.id,
+            media_type="video",
+            media_url=obj_in.video_url,
+            file_size_mb=Decimal("0.00"),
+            mime_type="video/mp4",
+            uploaded_by=user_id
+        ))
+    if obj_in.audio_url:
+        db.add(IntangibleMedia(
+            intangible_id=db_obj.id,
+            media_type="audio",
+            media_url=obj_in.audio_url,
+            file_size_mb=Decimal("0.00"),
+            mime_type="audio/mpeg",
+            uploaded_by=user_id
+        ))
+
     db.commit()
     db.refresh(db_obj)
     return db_obj
 
 
 def get_intangible_heritage(db: Session, id: UUID) -> Optional[IntangibleHeritage]:
-    return db.query(IntangibleHeritage).filter(IntangibleHeritage.id == id, IntangibleHeritage.deleted_at == None).first()
+    return (
+        db.query(IntangibleHeritage)
+        .options(
+            joinedload(IntangibleHeritage.creator_details),
+            joinedload(IntangibleHeritage.media)
+        )
+        .filter(IntangibleHeritage.id == id, IntangibleHeritage.deleted_at == None)
+        .first()
+    )
 
 
 def list_intangible_heritages(
@@ -34,7 +90,14 @@ def list_intangible_heritages(
     status: Optional[str] = "approved",
     search: Optional[str] = None
 ) -> List[IntangibleHeritage]:
-    query = db.query(IntangibleHeritage).filter(IntangibleHeritage.deleted_at == None)
+    query = (
+        db.query(IntangibleHeritage)
+        .options(
+            joinedload(IntangibleHeritage.creator_details),
+            joinedload(IntangibleHeritage.media)
+        )
+        .filter(IntangibleHeritage.deleted_at == None)
+    )
     
     if status:
         query = query.filter(IntangibleHeritage.status == status)
@@ -59,9 +122,16 @@ def list_my_intangible_heritages(
     user_id: UUID,
     status: Optional[str] = None
 ) -> List[IntangibleHeritage]:
-    query = db.query(IntangibleHeritage).filter(
-        IntangibleHeritage.contributor_id == user_id,
-        IntangibleHeritage.deleted_at == None
+    query = (
+        db.query(IntangibleHeritage)
+        .options(
+            joinedload(IntangibleHeritage.creator_details),
+            joinedload(IntangibleHeritage.media)
+        )
+        .filter(
+            IntangibleHeritage.contributor_id == user_id,
+            IntangibleHeritage.deleted_at == None
+        )
     )
     if status:
         query = query.filter(IntangibleHeritage.status == status)
