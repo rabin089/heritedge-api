@@ -19,6 +19,10 @@ class FestivalBase(BaseModel):
     nepali_date: Optional[str] = None
     
     region: Optional[str] = None
+    is_location_specific: bool = False
+    location_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     locations: Optional[List[LatLng]] = None
     
     category: Optional[FestivalCategory] = None
@@ -39,6 +43,10 @@ class FestivalCreate(FestivalBase):
                 "significance": "Marks the beginning of spring season",
                 "category": "Cultural",
                 "region": "Kathmandu",
+                "is_location_specific": True,
+                "location_name": "Kathmandu Durbar Square",
+                "latitude": 27.7061,
+                "longitude": 85.3301,
                 "locations": [{"lat": 27.7061, "lng": 85.3301}],
                 "start_date": "2026-04-15T10:00:00Z",
                 "end_date": "2026-04-17T18:00:00Z",
@@ -62,6 +70,10 @@ class FestivalUpdate(BaseModel):
     nepali_date: Optional[str] = None
     
     region: Optional[str] = None
+    is_location_specific: Optional[bool] = None
+    location_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     locations: Optional[List[LatLng]] = None
     
     category: Optional[FestivalCategory] = None

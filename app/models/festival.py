@@ -38,6 +38,10 @@ class Festival(Base):
     nepali_date = Column(String)  # optional but powerful
     
     region = Column(String)
+    is_location_specific = Column(Boolean, default=False)
+    location_name = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
     locations = Column(JSONB)  # [LatLng] - multiple allowed
     
     category = Column(Enum(FestivalCategory))  # Religious, Cultural, National

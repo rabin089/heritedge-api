@@ -153,8 +153,9 @@ def create_festival(
         image_url=festival_in.main_image,
         secondary_images=festival_in.gallery,
         tags=festival_in.tags,
-        latitude=festival_in.locations[0].get("lat") if festival_in.locations else None,
-        longitude=festival_in.locations[0].get("lng") if festival_in.locations else None,
+        latitude=festival_in.latitude if festival_in.latitude is not None else (festival_in.locations[0].lat if festival_in.locations else None),
+        longitude=festival_in.longitude if festival_in.longitude is not None else (festival_in.locations[0].lng if festival_in.locations else None),
+        location=festival_in.location_name,
         contributor_name=current_user.display_name or current_user.name,
         contributor_email=current_user.email,
     )
