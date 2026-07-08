@@ -5,6 +5,7 @@ from app.models.heritage_site import HeritageSite
 from app.schemas.heritage_site import HeritageSiteCreate
 from datetime import datetime, timezone
 from app.utils.geocoding_util import get_location_name_from_coordinates
+from app.utils.search_algorithms import best_fuzzy_score, haversine_distance_km
 
 
 def create_heritage_site(
@@ -38,6 +39,9 @@ def get_filtered_sites(
     q: str | None = None,
     page: int | None = None,
     page_size: int | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    radius_km: float | None = None,
 ):
     # Public should only see approved sites
     query = db.query(HeritageSite).options(joinedload(HeritageSite.creator_details)).filter(
@@ -51,28 +55,57 @@ def get_filtered_sites(
         query = query.filter(HeritageSite.category.ilike(f"%{category}%"))
     if tag:
         query = query.filter(tag == any_(HeritageSite.tags))
+    query = query.order_by(HeritageSite.created_at.desc())
+    sites = query.all()
+
     if q:
-        # fuzzy search on name, region, description, and tags string
-        tag_str = func.array_to_string(HeritageSite.tags, ',')
-        like = f"%{q}%"
-        query = query.filter(
-            (HeritageSite.name.ilike(like))
-            | (HeritageSite.region.ilike(like))
-            | (HeritageSite.description.ilike(like))
-            | (tag_str.ilike(like))
+        sites = [
+            site for site in sites
+            if best_fuzzy_score(
+                q,
+                [
+                    site.name,
+                    site.region,
+                    site.location,
+                    site.description,
+                    site.category,
+                    ",".join(site.tags or []),
+                ],
+            ) >= 0.62
+        ]
+        sites.sort(
+            key=lambda site: best_fuzzy_score(
+                q,
+                [
+                    site.name,
+                    site.region,
+                    site.location,
+                    site.description,
+                    site.category,
+                    ",".join(site.tags or []),
+                ],
+            ),
+            reverse=True,
         )
 
-    query = query.order_by(HeritageSite.created_at.desc())
+    if latitude is not None and longitude is not None:
+        sites_with_distance = []
+        for site in sites:
+            if site.latitude is None or site.longitude is None:
+                continue
+            distance_km = haversine_distance_km(latitude, longitude, site.latitude, site.longitude)
+            if radius_km is None or distance_km <= radius_km:
+                site.distance_km = round(distance_km, 2)
+                sites_with_distance.append(site)
+        sites = sorted(sites_with_distance, key=lambda site: site.distance_km)
 
-    # pagination (backward compatible: only apply if params provided)
     if page_size is not None or page is not None:
-        p = page or 1
-        ps = page_size or 20
-        ps = min(max(ps, 1), 100)
-        offset = (max(p, 1) - 1) * ps
-        query = query.offset(offset).limit(ps)
+        p = max(page or 1, 1)
+        ps = min(max(page_size or 20, 1), 100)
+        offset = (p - 1) * ps
+        sites = sites[offset:offset + ps]
 
-    return query.all()
+    return sites
 
 
 def get_site_by_id(db: Session, site_id: UUID):

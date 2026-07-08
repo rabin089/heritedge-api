@@ -43,6 +43,9 @@ def list_festivals(
     status: Optional[FestivalStatus] = Query(None, description="Filter by status"),
     tag: Optional[str] = Query(None, description="Filter by tag"),
     q: Optional[str] = Query(None, description="Search query"),
+    latitude: Optional[float] = Query(None, ge=-90, le=90, description="Current latitude for nearby search"),
+    longitude: Optional[float] = Query(None, ge=-180, le=180, description="Current longitude for nearby search"),
+    radius_km: Optional[float] = Query(None, gt=0, description="Maximum distance in kilometers"),
     db: Session = Depends(get_db)
 ):
     """List public approved festivals with filters and pagination"""
@@ -65,7 +68,10 @@ def list_festivals(
         category=category,
         status=query_status,
         tag=tag,
-        q=q
+        q=q,
+        latitude=latitude,
+        longitude=longitude,
+        radius_km=radius_km
     )
     
     return FestivalListResponse(

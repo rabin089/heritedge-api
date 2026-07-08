@@ -29,10 +29,15 @@ def get_sites(
     q: Optional[str] = None,
     page: Optional[int] = None,
     page_size: Optional[int] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    radius_km: Optional[float] = None,
     db: Session = Depends(get_db),
 ):
     try:
-        return crud.get_filtered_sites(db, region, category, tag, q, page, page_size)
+        return crud.get_filtered_sites(
+            db, region, category, tag, q, page, page_size, latitude, longitude, radius_km
+        )
     except TypeError:
         # compatibility with monkeypatched tests expecting old signature
         return crud.get_filtered_sites(db, region, category, tag)
@@ -47,6 +52,9 @@ def get_sites_secured(
     q: Optional[str] = None,
     page: Optional[int] = None,
     page_size: Optional[int] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    radius_km: Optional[float] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -54,7 +62,9 @@ def get_sites_secured(
     if not (is_admin(current_user) or is_reviewer(current_user)):
         raise HTTPException(status_code=403, detail="Admin or reviewer only")
     try:
-        return crud.get_filtered_sites(db, region, category, tag, q, page, page_size)
+        return crud.get_filtered_sites(
+            db, region, category, tag, q, page, page_size, latitude, longitude, radius_km
+        )
     except TypeError:
         # compatibility with monkeypatched tests expecting old signature
         return crud.get_filtered_sites(db, region, category, tag)

@@ -29,6 +29,7 @@ class HeritageSiteOut(HeritageSiteBase):
     is_pending: bool = False
     contributor_id: Optional[UUID] = None
     contributor_name: str = "Anonymous"
+    distance_km: Optional[float] = None
 
     class Config:
         from_attributes = True

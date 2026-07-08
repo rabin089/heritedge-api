@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 from typing import Iterable
+from uuid import UUID
+
 from sqlalchemy.orm import Session
 from app.models.notification import Notification
 
@@ -30,8 +32,8 @@ def list_my_notifications(db: Session, recipient_email: str):
     )
 
 
-def mark_read(db: Session, recipient_email: str, notification_ids: Iterable[int]) -> int:
-    ids = list(notification_ids)
+def mark_read(db: Session, recipient_email: str, notification_ids: Iterable[UUID]) -> int:
+    ids: list[UUID] = list(notification_ids)
     if not ids:
         return 0
     q = (

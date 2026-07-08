@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 from app.models.intangible_heritage import IntangibleHeritage, IntangibleMedia
+from app.utils.search_algorithms import best_fuzzy_score
 from app.schemas.intangible_heritage import (
     IntangibleHeritageCreate, 
     IntangibleHeritageUpdate,
@@ -105,16 +105,41 @@ def list_intangible_heritages(
     if category:
         query = query.filter(IntangibleHeritage.category == category)
         
+    items = query.order_by(IntangibleHeritage.created_at.desc()).all()
+
     if search:
-        query = query.filter(
-            or_(
-                IntangibleHeritage.name_en.ilike(f"%{search}%"),
-                IntangibleHeritage.name_np.ilike(f"%{search}%"),
-                IntangibleHeritage.community.ilike(f"%{search}%")
-            )
+        items = [
+            item for item in items
+            if best_fuzzy_score(
+                search,
+                [
+                    item.name_en,
+                    item.name_np,
+                    item.description,
+                    item.community,
+                    item.language,
+                    item.category,
+                    item.practiced_at_description,
+                ],
+            ) >= 0.62
+        ]
+        items.sort(
+            key=lambda item: best_fuzzy_score(
+                search,
+                [
+                    item.name_en,
+                    item.name_np,
+                    item.description,
+                    item.community,
+                    item.language,
+                    item.category,
+                    item.practiced_at_description,
+                ],
+            ),
+            reverse=True,
         )
-        
-    return query.order_by(IntangibleHeritage.created_at.desc()).offset(skip).limit(limit).all()
+
+    return items[skip:skip + limit]
 
 
 def list_my_intangible_heritages(

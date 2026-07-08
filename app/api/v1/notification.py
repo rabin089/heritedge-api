@@ -117,11 +117,30 @@ def test_push_notification(db: Session = Depends(get_db), current_user: User = D
         f"triggered by {current_user.email}"
     )
 
-    # 3. Send the test notification to ALL collected devices via multicast
+    # 3. Persist an in-app notification row for every unique recipient so the
+    #    broadcast also shows up in GET /api/v1/notifications (the FCM push
+    #    is just a wake-up signal; the DB row is the source of truth).
+    broadcast_title = "Test Push Notification"
+    broadcast_message = (
+        "This is a test notification. "
+        "If you see this, push notifications are working!"
+    )
+    unique_recipient_emails = {d.user_email for d in devices}
+    for user_email in unique_recipient_emails:
+        crud.create_notification(
+            db,
+            recipient_email=user_email,
+            type="broadcast",
+            title=broadcast_title,
+            message=broadcast_message,
+        )
+    db.commit()
+
+    # 4. Send the test notification to ALL collected devices via multicast
     result = send_multicast_notification(
         tokens=tokens,
-        title="Test Push Notification",
-        body="This is a test notification. If you see this, push notifications are working!",
+        title=broadcast_title,
+        body=broadcast_message,
         data={"type": "test_notification", "sent_at": str(__import__('datetime').datetime.now(timezone.utc).isoformat())}
     )
 

@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from app.models.festival import Festival, FestivalHeritageSite, FestivalStatus, FestivalCategory
 from app.models.heritage_site import HeritageSite
 from app.schemas.festival import FestivalCreate, FestivalUpdate, FestivalHeritageSiteCreate
+from app.utils.search_algorithms import best_fuzzy_score, haversine_distance_km
 from uuid import UUID
 import uuid
 
@@ -26,6 +27,9 @@ class FestivalCRUD:
         created_by: Optional[str] = None,
         tag: Optional[str] = None,
         q: Optional[str] = None,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        radius_km: Optional[float] = None,
         is_approved: Optional[bool] = None, # Legacy support or mapping
         include_unapproved: bool = False
     ) -> tuple[List[Festival], int]:
@@ -57,20 +61,55 @@ class FestivalCRUD:
             # Assumes tags is ARRAY(String)
             query = query.filter(func.array_to_string(Festival.tags, ',').ilike(f"%{tag}%"))
         
+        festivals = query.all()
+
         if q:
-            # Fuzzy search across multiple fields
-            search_filter = or_(
-                Festival.name.ilike(f"%{q}%"),
-                Festival.description.ilike(f"%{q}%"),
-                Festival.significance.ilike(f"%{q}%"),
+            festivals = [
+                festival for festival in festivals
+                if best_fuzzy_score(
+                    q,
+                    [
+                        festival.name,
+                        festival.description,
+                        festival.significance,
+                        festival.region,
+                        festival.location_name,
+                        festival.nepali_date,
+                        ",".join(festival.tags or []),
+                    ],
+                ) >= 0.62
+            ]
+            festivals.sort(
+                key=lambda festival: best_fuzzy_score(
+                    q,
+                    [
+                        festival.name,
+                        festival.description,
+                        festival.significance,
+                        festival.region,
+                        festival.location_name,
+                        festival.nepali_date,
+                        ",".join(festival.tags or []),
+                    ],
+                ),
+                reverse=True,
             )
-            query = query.filter(search_filter)
-        
-        # Get total count
-        total = query.count()
-        
-        # Apply pagination
-        festivals = query.offset(skip).limit(limit).all()
+
+        if latitude is not None and longitude is not None:
+            festivals_with_distance = []
+            for festival in festivals:
+                if festival.latitude is None or festival.longitude is None:
+                    continue
+                distance_km = haversine_distance_km(
+                    latitude, longitude, festival.latitude, festival.longitude
+                )
+                if radius_km is None or distance_km <= radius_km:
+                    festival.distance_km = round(distance_km, 2)
+                    festivals_with_distance.append(festival)
+            festivals = sorted(festivals_with_distance, key=lambda festival: festival.distance_km)
+
+        total = len(festivals)
+        festivals = festivals[skip:skip + limit]
         
         return festivals, total
 

@@ -19,6 +19,7 @@ from app.models.festival_interaction import FestivalReminder
 from app.models.festival import Festival, DateDeterminationType
 from app.models.user_device import UserDevice
 from app.services.notification_service import send_multicast_notification
+from app.crud import notifications as notif_crud
 
 logger = logging.getLogger(__name__)
 
@@ -75,10 +76,23 @@ def send_reminder_notifications():
                 festival = db.query(Festival).filter(Festival.id == reminder.festival_id).first()
                 if not festival:
                     continue
+                title = f"🎉 {festival.name} is coming up!"
+                body = "You have a reminder set for this festival. Make sure you're ready!"
+
+                # Persist an in-app notification row so it shows up in
+                # GET /api/v1/notifications, not just as a one-off FCM push.
+                notif_crud.create_notification(
+                    db,
+                    recipient_email=user_email,
+                    type="festival_reminder",
+                    title=title,
+                    message=body,
+                )
+
                 send_multicast_notification(
                     tokens=tokens,
-                    title=f"🎉 {festival.name} is coming up!",
-                    body="You have a reminder set for this festival. Make sure you're ready!",
+                    title=title,
+                    body=body,
                     data={
                         "type": "festival_reminder",
                         "festival_id": str(festival.id),
@@ -86,6 +100,7 @@ def send_reminder_notifications():
                     }
                 )
 
+        db.commit()
         logger.info("✅ Reminder notifications job completed.")
     except Exception as e:
         logger.error(f"Error in reminder notification job: {e}")
@@ -131,10 +146,23 @@ def ping_contributors_for_dates():
             if not tokens:
                 continue
 
+            title = f"📅 Update needed for {festival.name}"
+            body = f"You added '{festival.name}' to Heritedge. Can you confirm this year's dates so the community stays informed?"
+
+            # Persist an in-app notification row so the ping shows up in
+            # GET /api/v1/notifications, not just as a one-off FCM push.
+            notif_crud.create_notification(
+                db,
+                recipient_email=contributor.email,
+                type="date_verification_request",
+                title=title,
+                message=body,
+            )
+
             send_multicast_notification(
                 tokens=tokens,
-                title=f"📅 Update needed for {festival.name}",
-                body=f"You added '{festival.name}' to Heritedge. Can you confirm this year's dates so the community stays informed?",
+                title=title,
+                body=body,
                 data={
                     "type": "date_verification_request",
                     "festival_id": str(festival.id),
@@ -142,6 +170,7 @@ def ping_contributors_for_dates():
                 }
             )
 
+        db.commit()
         logger.info("✅ Contributor ping job completed.")
     except Exception as e:
         logger.error(f"Error in contributor ping job: {e}")
