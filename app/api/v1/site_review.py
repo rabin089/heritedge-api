@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
+from app.services.activity_service import record_activity
+from app.models.user_activity import ItemType, ActionType
 from typing import List, Optional
 from uuid import UUID
 from app.core.database import SessionLocal
@@ -41,6 +43,7 @@ def get_popular_sites(
 def create_site_review(
     site_id: UUID,
     review_data: SiteReviewCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -48,6 +51,16 @@ def create_site_review(
     review_data = SiteReviewCreate(site_id=site_id, **review_data.dict(exclude={"site_id"}))
     try:
         review = crud.create_site_review(db, review_data, current_user.email)
+        
+        # Record activity
+        record_activity(
+            db=db,
+            user_id=current_user.id,
+            item_id=site_id,
+            item_type=ItemType.site,
+            action_type=ActionType.review,
+            background_tasks=background_tasks
+        )
         return review
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

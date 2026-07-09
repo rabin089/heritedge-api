@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
+from app.services.activity_service import record_activity
+from app.models.user_activity import ItemType, ActionType
 from typing import List
 from app.core.database import SessionLocal
 from app.schemas.heritage_site import HeritageSiteOut
@@ -20,10 +22,24 @@ def get_db():
 
 
 @router.post("/{site_id}")
-def add_favorite(site_id: UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def add_favorite(
+    site_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     ok = crud.add_favorite(db, current_user.id, site_id)
     if not ok:
         raise HTTPException(status_code=400, detail="Failed to add favorite")
+    
+    record_activity(
+        db=db,
+        user_id=current_user.id,
+        item_id=site_id,
+        item_type=ItemType.site,
+        action_type=ActionType.favorite,
+        background_tasks=background_tasks
+    )
     return {"message": "Added to favorites"}
 
 

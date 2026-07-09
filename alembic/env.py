@@ -17,6 +17,9 @@ from app.models import festival_interaction
 from app.models import user_device
 from app.models import intangible_heritage
 from app.models import user_settings
+from app.models import user_activity
+from app.models import user_interest_profile
+from app.models import recommendation_history
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

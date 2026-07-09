@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Text, Integer, Float, Boolean, ForeignKey, DateTime, DECIMAL, Index
-from sqlalchemy.dialects.postgresql import UUID, INET, TSVECTOR
+from sqlalchemy.dialects.postgresql import UUID, INET, TSVECTOR, ARRAY
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 import uuid
@@ -22,6 +22,7 @@ class IntangibleHeritage(Base):
     # Community & Language
     community = Column(String(100), index=True)
     language = Column(String(100))
+    tags = Column(ARRAY(String), nullable=True)
     
     # Geographic & Practical
     location_id = Column(UUID(as_uuid=True), ForeignKey("heritage_sites.id", ondelete="SET NULL"), nullable=True, index=True)
