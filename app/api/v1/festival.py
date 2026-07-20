@@ -389,3 +389,18 @@ def remove_heritage_site_from_festival(
         return {"message": "Heritage site removed from festival successfully"}
     else:
         raise HTTPException(status_code=404, detail="Festival-heritage site relationship not found")
+
+
+@router.post("/festivals/{festival_id}/view")
+def increment_festival_views(
+    festival_id: UUID,
+    db: Session = Depends(get_db),
+):
+    """Increment the view count for a festival"""
+    festival = festival_crud.get(db, festival_id)
+    if not festival:
+        raise HTTPException(status_code=404, detail="Festival not found")
+    
+    festival.views_count += 1
+    db.commit()
+    return {"message": "View count incremented", "views_count": festival.views_count}

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Float, Text, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, String, Float, Text, Boolean, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -22,6 +22,7 @@ class HeritageSite(Base):
     tags = Column(ARRAY(String, dimensions=1), nullable=True)
     is_pending = Column(Boolean, default=False, nullable=False)  # approved data is not pending
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    views_count = Column(Integer, default=0, nullable=False)
 
     created_by = Column(String, nullable=False)           # original contributor user id/email
     contribution_id = Column(UUID(as_uuid=True), ForeignKey("contributions.id"), nullable=True)

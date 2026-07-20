@@ -119,3 +119,17 @@ def delete_site(
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
     return {"message": "Heritage site deleted successfully."}
+
+
+# PUBLIC: increment view count
+@router.post("/{site_id}/view")
+def increment_site_views(
+    site_id: UUID,
+    db: Session = Depends(get_db),
+):
+    site = crud.get_site_by_id(db, site_id)
+    if not site:
+        raise HTTPException(status_code=404, detail="Site not found")
+    site.views_count += 1
+    db.commit()
+    return {"message": "View count incremented", "views_count": site.views_count}

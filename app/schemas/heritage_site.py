@@ -30,6 +30,7 @@ class HeritageSiteOut(HeritageSiteBase):
     contributor_id: Optional[UUID] = None
     contributor_name: str = "Anonymous"
     distance_km: Optional[float] = None
+    views_count: int = 0
 
     class Config:
         from_attributes = True
