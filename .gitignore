@@ -30,5 +30,13 @@ build/
 # Logs
 *.log
 
+# Test output / generated reports
+*.txt
+report.html
+test_report.html
+.coverage
+htmlcov/
+tmp/
+
 # Docker
 .dockerignore

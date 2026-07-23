@@ -71,7 +71,7 @@ def calculate_similarity_score(user_profile: UserInterestProfile, item) -> float
         return 0.0
         
     item_tags = set(str(t).lower() for t in item_tags)
-    user_tags = set(user_profile.tag_scores.keys())
+    user_tags = set(str(t).lower() for t in user_profile.tag_scores.keys())
     
     intersection = user_tags.intersection(item_tags)
     union = user_tags.union(item_tags)
